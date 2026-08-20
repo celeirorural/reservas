@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <title>Celeiro - Autorreserva de Mesas</title>
+   
+   <!-- Meta Pixel Code -->
+   <script>
+   !function(f,b,e,v,n,t,s)
+   {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+   n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+   if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+   n.queue=[];t=b.createElement(e);t.async=!0;
+   t.src=v;s=b.getElementsByTagName(e)[0];
+   s.parentNode.insertBefore(t,s)}(window, document,'script',
+   'https://connect.facebook.net/en_US/fbevents.js');
+   fbq('init', '1412141617304259');
+   fbq('track', 'PageView');
+   </script>
+   <noscript><img height="1" width="1" style="display:none"
+   src="https://www.facebook.com/tr?id=1412141617304259&ev=PageView&noscript=1"
+   /></noscript>
+   <!-- End Meta Pixel Code -->
+
+   <!-- Google Fonts -->
+   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+   <!-- FontAwesome 6.4.0 -->
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+   
+   <!-- Firebase v8.10.1 -->
+   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+   
+   <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+   <header class="main-header">
+       <div class="logo logo-admin-trigger" onclick="abrirAcessoAdmin()" title="Área administrativa">
+           <img src="logo.png" alt="Celeiro Rural" class="brand-logo">
+       </div>
+       <div id="conexao-status-container" class="connection-status-hidden" aria-hidden="true"></div>
+   </header>
+
+   <main class="content-wrapper">
+
+       <!-- ETAPA DE FORMULÁRIO -->
+       <div id="secao-formulario" class="fade-in">
+           <form id="form-autorreserva">
+               
+               <!-- PASSO 1 -->
+               <div class="card">
+                   <h2><i class="fa-solid fa-user-group"></i> 1. Responsável e Grupo</h2>
+                   
+                   <div class="input-group">
+                       <label>Nome Completo do Responsável</label>
+                       <input type="text" id="cli-nome" required placeholder="Digite seu nome completo">
+                   </div>
+
+                   <div class="form-row-triple">
+                       <div class="input-group">
+                           <label>Adultos</label>
+                           <input type="number" id="cli-adultos" min="1" max="30" value="2" required onchange="validarCapacidadeGrupo()">
+                       </div>
+                       <div class="input-group">
+                           <label>0-5 Anos (Free)</label>
+                           <input type="number" id="cli-kids05" min="0" max="30" value="0" required onchange="validarCapacidadeGrupo()">
+                       </div>
+                       <div class="input-group">
+                           <label>6-10 Anos (Meia)</label>
+                           <input type="number" id="cli-kids610" min="0" max="30" value="0" required onchange="validarCapacidadeGrupo()">
+                       </div>
+                   </div>
+                   
+                   <div id="alerta-grupo-grande" class="banner-alerta hidden">
+                       <i class="fa-solid fa-users"></i>
+                       <div>
+                           <p><strong>RESERVA PARA GRUPOS ACIMA DE 30 PESSOAS:</strong></p>
+                           <p>Para grandes eventos, o atendimento e organização das mesas devem ser combinados diretamente via WhatsApp.</p>
+                       </div>
+                   </div>
+               </div>
+
+               <!-- PASSO 2 -->
+               <div class="card">
+                   <h2><i class="fa-solid fa-calendar-days"></i> 2. Data, Horário e Mesa</h2>
+
+                   <div class="input-group client-date-group">
+                       <label>Data da Reserva (Domingos e Feriados)</label>
+                       <input type="hidden" id="cli-data">
+                       <div class="client-calendar-card" id="client-calendar-card">
+                               <div class="client-calendar-head">
+                                   <div>
+                                       <span class="client-calendar-caption">Calendário de reservas</span>
+                                       <h3 id="client-month-title">-</h3>
+                                   </div>
+                                   <div class="client-calendar-nav">
+                                       <button type="button" onclick="mudarMesCliente(-1)" aria-label="Mês anterior"><i class="fa-solid fa-chevron-left"></i></button>
+                                       <button type="button" onclick="irParaMesAtualCliente()">Hoje</button>
+                                       <button type="button" onclick="mudarMesCliente(1)" aria-label="Próximo mês"><i class="fa-solid fa-chevron-right"></i></button>
+                                   </div>
+                               </div>
+                               <div class="client-calendar-legend">
+                                   <span><i class="client-legend-dot selected"></i> Selecionado</span>
+                                   <span><i class="client-legend-dot reserva"></i> Tem reserva</span>
+                                   <span><i class="client-legend-dot feriado"></i> Feriado</span>
+                               </div>
+                               <div id="client-calendar" class="client-calendar-grid"></div>
+                       </div>
+                   </div>
+
+                   <div class="form-row-double client-time-row">
+                       <div class="input-group">
+                           <label>Horário da Reserva</label>
+                           <select id="cli-horario" class="native-custom-select" aria-hidden="true" tabindex="-1" required>
+                               <option value="11:30">11:30</option>
+                               <option value="11:45">11:45</option>
+                               <option value="12:00" selected>12:00</option>
+                               <option value="12:15">12:15</option>
+                               <option value="12:30">12:30</option>
+                           </select>
+                           <div class="custom-select" data-select-id="cli-horario">
+                               <button type="button" class="custom-select-trigger" aria-haspopup="listbox" aria-expanded="false">12:00 <i class="fa-solid fa-chevron-down"></i></button>
+                               <div class="custom-select-menu" role="listbox"></div>
+                           </div>
+                       </div>
+                       <div class="input-group">
+                           <label>Número da Mesa Desejada</label>
+                           <select id="cli-mesa" class="native-custom-select" aria-hidden="true" tabindex="-1" required>
+                               <option value="">Selecione a data para carregar as mesas</option>
+                           </select>
+                           <div class="custom-select" data-select-id="cli-mesa">
+                               <button type="button" class="custom-select-trigger placeholder" aria-haspopup="listbox" aria-expanded="false">selecione o N° da sua mesa <i class="fa-solid fa-chevron-down"></i></button>
+                               <div class="custom-select-menu" role="listbox"></div>
+                           </div>
+                       </div>
+                   </div>
+
+                   <div class="input-group">
+                       <label>Telefone <span class="campo-opcional">(Opcional)</span></label>
+                       <input type="tel" id="cli-telefone" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="(14) 99999-9999">
+                   </div>
+
+                   <div class="input-group">
+                       <label>Preferências / Observações</label>
+                       <textarea id="cli-obs" rows="2" placeholder="Longe da Música, Perto das Brincadeiras, etc."></textarea>
+                   </div>
+               </div>
+
+               <!-- PASSO 3 -->
+               <div class="card">
+                   <h2><i class="fa-solid fa-clock"></i> 3. Regra de Tolerância</h2>
+
+                   <div class="banner-alerta">
+                       <i class="fa-solid fa-triangle-exclamation"></i>
+                       <p><strong>ATENÇÃO:</strong> Garantimos a reserva da sua mesa <strong>das 11:30 até às 12:30 no máximo</strong>. Caso vá chegar após esse horário, informe nossa equipe para ajustarmos sua tolerância.</p>
+                   </div>
+
+                   <button type="submit" id="btn-submit" class="btn-action">
+                       <i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA
+                   </button>
+                   
+                   <a id="btn-whatsapp-grupo" class="btn-action btn-whatsapp hidden" href="#" target="_blank">
+                       <i class="fa-brands fa-whatsapp" style="font-size: 1.2rem;"></i> SOLICITAR RESERVA PARA GRANDE EVENTO
+                   </a>
+               </div>
+
+           </form>
+       </div>
+
+       <!-- PASSO 4: COMPROVANTE DE RESERVA -->
+       <div id="secao-comprovante" class="hidden fade-in">
+           <div class="recibo-card">
+               <div class="recibo-header">
+                   <h3><img src="logo.png" alt="Celeiro Rural" class="receipt-logo"> <span>Reservas</span></h3>
+                   <div class="recibo-codigo">CÓDIGO DA RESERVA: <span id="rec-codigo" class="recibo-destaque">#000000</span></div>
+               </div>
+
+               <div class="recibo-linha">
+                   <span class="rotulo">Responsável:</span>
+                   <span class="valor" id="rec-nome">-</span>
+               </div>
+               <div class="recibo-linha" id="linha-telefone">
+                   <span class="rotulo">Telefone:</span>
+                   <span class="valor" id="rec-telefone">-</span>
+               </div>
+               <div class="recibo-linha">
+                   <span class="rotulo">Total de Integrantes:</span>
+                   <span class="valor" id="rec-pessoas">-</span>
+               </div>
+               <div class="recibo-linha">
+                   <span class="rotulo">Data Reservada:</span>
+                   <span class="valor" id="rec-data">-</span>
+               </div>
+               <div class="recibo-linha">
+                   <span class="rotulo">Horário Reservado:</span>
+                   <span class="valor" id="rec-horario">-</span>
+               </div>
+               <div class="recibo-linha">
+                   <span class="rotulo">Mesa Alocada:</span>
+                   <span class="valor" id="rec-mesa" class="recibo-destaque">-</span>
+               </div>
+               <div class="recibo-linha" id="linha-obs">
+                   <span class="rotulo">Preferências / Obs:</span>
+                   <span class="valor" id="rec-obs">-</span>
+               </div>
+
+               <div class="banner-alerta" style="margin-top: 18px; margin-bottom: 0;">
+                   <i class="fa-solid fa-circle-info"></i>
+                   <p>Mesa garantida até às <strong>12:30</strong>. Clique no botão abaixo para enviar a confirmação para o nosso atendimento.</p>
+               </div>
+           </div>
+
+           <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+               <button onclick="enviarComprovanteWhatsApp()" class="btn-action btn-whatsapp">
+                   <i class="fa-brands fa-whatsapp" style="font-size: 1.3rem;"></i> ENVIAR COMPROVANTE VIA WHATSAPP
+               </button>
+               
+               <button onclick="reiniciarFormulario()" class="btn-action btn-secundario">
+                   <i class="fa-solid fa-plus-circle"></i> CRIAR NOVA RESERVA
+               </button>
+           </div>
+       </div>
+
+   
+        <!-- POP-UP PARA GRUPOS ACIMA DE 30 PESSOAS -->
+       <div id="grupo-limite-popup" class="group-limit-modal hidden" aria-hidden="true">
+           <div class="group-limit-backdrop" onclick="fecharPopupGrupoGrande()"></div>
+           <div class="group-limit-box" role="dialog" aria-modal="true" aria-labelledby="grupo-limite-titulo">
+               <button type="button" class="group-limit-close" onclick="fecharPopupGrupoGrande()" aria-label="Fechar">
+                   <i class="fa-solid fa-xmark"></i>
+               </button>
+               <div class="group-limit-icon"><i class="fa-solid fa-users"></i></div>
+               <span class="group-limit-eyebrow">Reserva especial</span>
+               <h3 id="grupo-limite-titulo">Reservas acima de 30 pessoas</h3>
+               <p>Para grupos maiores, precisamos organizar as mesas e confirmar os detalhes diretamente com nossa equipe.</p>
+               <div class="group-limit-total"><strong id="grupo-limite-total">31</strong><span>pessoas na sua reserva</span></div>
+               <a id="btn-whatsapp-popup" class="btn-action btn-whatsapp group-limit-whatsapp" href="#" target="_blank" rel="noopener noreferrer">
+                   <i class="fa-brands fa-whatsapp"></i> FALAR PELO WHATSAPP
+               </a>
+               <button type="button" class="group-limit-secondary" onclick="fecharPopupGrupoGrande()">Voltar e ajustar quantidade</button>
+           </div>
+       </div>
+
+       <!-- ÁREA ADMINISTRATIVA — ACESSÍVEL SOMENTE APÓS O PIN -->
+        <section id="secao-admin" class="hidden fade-in">
+            <div class="admin-header-card">
+                <div>
+                    <span class="admin-eyebrow"><i class="fa-solid fa-lock"></i> Área administrativa</span>
+                    <h2>Reservas</h2>
+                    <p>Consulte os domingos e feriados e veja as reservas abertas de cada data.</p>
+                </div>
+                <button type="button" class="admin-close-btn" onclick="fecharAreaAdmin()" title="Fechar área administrativa">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="admin-summary-grid">
+                <div class="admin-stat">
+                    <span class="admin-stat-number" id="admin-total-reservas">0</span>
+                    <span class="admin-stat-label">Reservas</span>
+                </div>
+                <div class="admin-stat">
+                    <span class="admin-stat-number" id="admin-total-pessoas">0</span>
+                    <span class="admin-stat-label">Pessoas</span>
+                </div>
+                <div class="admin-stat">
+                    <span class="admin-stat-number" id="admin-total-adultos">0</span>
+                    <span class="admin-stat-label">Adultos</span>
+                </div>
+                <div class="admin-stat">
+                    <span class="admin-stat-number" id="admin-total-criancas">0</span>
+                    <span class="admin-stat-label">Crianças</span>
+                </div>
+            </div>
+
+            <div class="card admin-calendar-card">
+                <div class="admin-calendar-top">
+                    <div>
+                        <span class="admin-calendar-caption">Calendário de reservas</span>
+                        <h3 id="admin-month-title">Agosto 2026</h3>
+                    </div>
+                    <div class="admin-calendar-nav">
+                        <button type="button" onclick="mudarMesAdmin(-1)" aria-label="Mês anterior">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button type="button" onclick="irParaMesAtualAdmin()" aria-label="Mês atual">
+                            Hoje
+                        </button>
+                        <button type="button" onclick="mudarMesAdmin(1)" aria-label="Próximo mês">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-calendar-legend">
+                    <span><i class="legend-dot legend-selected"></i> Selecionado</span>
+                    <span><i class="legend-dot legend-reserva"></i> Tem reserva</span>
+                    <span><i class="legend-dot legend-feriado"></i> Feriado</span>
+                </div>
+
+                <div id="admin-calendar" class="admin-calendar"></div>
+            </div>
+
+            <div class="card admin-list-card">
+                <div class="admin-list-heading">
+                    <div>
+                        <span class="admin-calendar-caption">Data selecionada</span>
+                        <h3 id="admin-selected-date-title">-</h3>
+                    </div>
+                    <span id="admin-selected-count" class="admin-count-badge">0 reservas</span>
+                </div>
+
+                <div class="admin-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" id="admin-busca" placeholder="Pesquisar cliente..." oninput="renderAdminReservas()">
+                </div>
+
+                <div id="admin-reservas-list" class="admin-reservas-list"></div>
+            </div>
+        </section>
+
+        <!-- MODAL DE EDIÇÃO DE RESERVA -->
+        <div id="admin-edit-modal" class="admin-modal hidden" aria-hidden="true">
+            <div class="admin-modal-backdrop" onclick="fecharEdicaoReservaAdmin()"></div>
+            <div class="admin-edit-box">
+                <button type="button" class="admin-pin-close" onclick="fecharEdicaoReservaAdmin()" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="admin-edit-heading">
+                    <div class="admin-pin-icon"><i class="fa-solid fa-user-gear"></i></div>
+                    <div>
+                        <span class="admin-eyebrow">Gerenciar reserva</span>
+                        <h3>Editar informações</h3>
+                    </div>
+                </div>
+
+                <input type="hidden" id="admin-edit-id">
+
+                <div class="admin-edit-grid">
+                    <div class="admin-edit-field admin-edit-full">
+                        <label for="admin-edit-nome">Nome</label>
+                        <input id="admin-edit-nome" type="text" autocomplete="name">
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-telefone">Telefone</label>
+                        <input id="admin-edit-telefone" type="tel" inputmode="tel" maxlength="15" placeholder="(14) 99999-9999">
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-data">Data</label>
+                        <select id="admin-edit-data"></select>
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-horario">Horário</label>
+                        <select id="admin-edit-horario">
+                            <option value="11:30">11:30</option>
+                            <option value="11:45">11:45</option>
+                            <option value="12:00">12:00</option>
+                            <option value="12:15">12:15</option>
+                            <option value="12:30">12:30</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-mesa">Mesa</label>
+                        <select id="admin-edit-mesa"></select>
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-adultos">Adultos</label>
+                        <input id="admin-edit-adultos" type="number" min="0" max="30">
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-kids05">Crianças 0–5</label>
+                        <input id="admin-edit-kids05" type="number" min="0" max="30">
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-kids610">Crianças 6–10</label>
+                        <input id="admin-edit-kids610" type="number" min="0" max="30">
+                    </div>
+
+                    <div class="admin-edit-field">
+                        <label for="admin-edit-status">Status</label>
+                        <select id="admin-edit-status">
+                            <option value="reservada">Reservada</option>
+                            <option value="ocupada">Sentado / Ocupada</option>
+                        </select>
+                    </div>
+
+                    <div class="admin-edit-field admin-edit-full">
+                        <label for="admin-edit-obs">Observação</label>
+                        <textarea id="admin-edit-obs" rows="3" placeholder="Preferências, observações ou informações importantes..." maxlength="500"></textarea>
+                    </div>
+                </div>
+
+                <div id="admin-edit-error" class="admin-pin-error admin-edit-error"></div>
+
+                <div class="admin-edit-actions">
+                    <button type="button" class="admin-edit-cancel" onclick="fecharEdicaoReservaAdmin()">Cancelar</button>
+                    <button type="button" class="btn-action admin-edit-save" id="admin-edit-save" onclick="salvarEdicaoReservaAdmin()">
+                        <i class="fa-solid fa-floppy-disk"></i> SALVAR ALTERAÇÕES
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE ACESSO DA ADMINISTRAÇÃO -->
+        <div id="admin-pin-modal" class="admin-modal hidden" aria-hidden="true">
+            <div class="admin-modal-backdrop" onclick="fecharPinAdmin()"></div>
+            <div class="admin-pin-box">
+                <button type="button" class="admin-pin-close" onclick="fecharPinAdmin()" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="admin-pin-icon">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3>Área administrativa</h3>
+                <p>Digite o PIN para visualizar as reservas.</p>
+                <input id="admin-pin-input" class="admin-pin-input" type="password" inputmode="numeric"
+                       maxlength="8" placeholder="PIN" autocomplete="off"
+                       onkeydown="if(event.key==='Enter') verificarPinAdmin()">
+                <div id="admin-pin-erro" class="admin-pin-error"></div>
+                <button type="button" class="btn-action" onclick="verificarPinAdmin()">
+                    <i class="fa-solid fa-arrow-right"></i> ACESSAR RESERVAS
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+   <!-- BOTÃO FLUTUANTE DO WHATSAPP -->
+   <a href="https://api.whatsapp.com/send/?phone=5514991449726&text=Ol%C3%A1%2C%20gostaria%20de%20tirar%20uma%20d%C3%BAvida%20sobre%20as%20reservas.&type=phone_number&app_absent=0" target="_blank" class="wsp-float" title="Falar no WhatsApp">
+       <i class="fa-brands fa-whatsapp"></i>
+   </a>
+    <script src="script.js"></script>
+</body>
+</html>
