@@ -152,7 +152,7 @@
 
                    <div class="banner-alerta">
                        <i class="fa-solid fa-triangle-exclamation"></i>
-                       <p><strong>ATENÇÃO:</strong> Garantimos a reserva da sua mesa <strong>das 11:30 até às 12:30 no máximo</strong>. Caso vá chegar após esse horário, informe nossa equipe para ajustarmos sua tolerância.</p>
+                       <p><strong>ATENÇÃO:</strong> Garantimos a reserva da sua mesa <strong>das 11:30 até às 12:00 no máximo</strong>. Caso vá chegar após esse horário, informe nossa equipe para ajustarmos sua tolerância.</p>
                    </div>
 
                    <button type="submit" id="btn-submit" class="btn-action">
@@ -206,7 +206,7 @@
 
                <div class="banner-alerta" style="margin-top: 18px; margin-bottom: 0;">
                    <i class="fa-solid fa-circle-info"></i>
-                   <p>Mesa garantida até às <strong>12:30</strong>. Clique no botão abaixo para enviar a confirmação para o nosso atendimento.</p>
+                   <p>Mesa garantida até às <strong>12:00</strong>. Clique no botão abaixo para enviar a confirmação para o nosso atendimento.</p>
                </div>
            </div>
 
@@ -402,6 +402,38 @@
                     <button type="button" class="admin-edit-cancel" onclick="fecharEdicaoReservaAdmin()">Cancelar</button>
                     <button type="button" class="btn-action admin-edit-save" id="admin-edit-save" onclick="salvarEdicaoReservaAdmin()">
                         <i class="fa-solid fa-floppy-disk"></i> SALVAR ALTERAÇÕES
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE RESERVA -->
+        <div id="admin-delete-modal" class="admin-modal hidden" aria-hidden="true" role="dialog" aria-labelledby="admin-delete-title">
+            <div class="admin-modal-backdrop" onclick="fecharModalExclusaoAdmin()"></div>
+            <div class="admin-delete-box">
+                <button type="button" class="admin-pin-close" onclick="fecharModalExclusaoAdmin()" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="admin-delete-icon-wrapper">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+
+                <span class="admin-eyebrow" style="color: var(--terracota-sol);">Confirmar ação</span>
+                <h3 id="admin-delete-title">Excluir Reserva</h3>
+
+                <p class="admin-delete-question">Tem certeza que deseja excluir esta reserva de mesa?</p>
+
+                <div id="admin-delete-reserva-info" class="admin-delete-reserva-summary"></div>
+
+                <div id="admin-delete-error" class="admin-pin-error"></div>
+
+                <div class="admin-delete-actions">
+                    <button type="button" class="admin-delete-cancel" onclick="fecharModalExclusaoAdmin()">
+                        Cancelar
+                    </button>
+                    <button type="button" class="admin-delete-confirm-btn" id="admin-btn-confirm-delete" onclick="confirmarExclusaoReservaAdmin()">
+                        <i class="fa-solid fa-trash-can"></i> Sim, Excluir
                     </button>
                 </div>
             </div>

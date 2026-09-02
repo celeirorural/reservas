@@ -180,8 +180,14 @@
            document.body.classList.remove('modal-open');
        }
 
-       function mostrarPopupNotificacao() {
+       function mostrarPopupNotificacao(mensagem = 'Reserva concluída com sucesso!', icone = 'fa-circle-check') {
            const popup = document.getElementById('popup-notificacao');
+           if (!popup) return;
+           const span = popup.querySelector('span');
+           const iconeEl = popup.querySelector('i');
+           if (span) span.textContent = mensagem;
+           if (iconeEl) iconeEl.className = `fa-solid ${icone}`;
+
            popup.classList.remove('show');
            void popup.offsetWidth; 
            popup.classList.add('show');
@@ -614,7 +620,7 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
            textoMsg += `👤 *Nome:* ${dadosReservaAtual.nome}\n`;
            textoMsg += `👥 *Integrantes:* ${totalP} (${dadosReservaAtual.adultos} Ad, ${dadosReservaAtual.kids610} Meia, ${dadosReservaAtual.kids05} Free)\n`;
            textoMsg += `📅 *Data:* ${formatarDataBR(dadosReservaAtual.data)}\n`;
-           textoMsg += `🕒 *Horário:* ${dadosReservaAtual.horario} (Tolerância até 12:30)\n`;
+           textoMsg += `🕒 *Horário:* ${dadosReservaAtual.horario} (Tolerância até 12:00)\n`;
            textoMsg += `🪑 *Mesa:* Mesa ${dadosReservaAtual.mesa}\n`;
            if (dadosReservaAtual.telefone) {
                textoMsg += `📞 *Telefone:* ${dadosReservaAtual.telefone}\n`;
@@ -968,6 +974,9 @@ function renderAdminReservas() {
                         <button type="button" class="admin-edit-icon" onclick="editarReservaAdmin('${escaparHTMLAdmin(r.id)}')" title="Editar reserva" aria-label="Editar reserva de ${escaparHTMLAdmin(r.nome || 'cliente')}">
                             <i class="fa-solid fa-user-gear"></i>
                         </button>
+                        <button type="button" class="admin-delete-icon" onclick="solicitarExclusaoReservaAdmin('${escaparHTMLAdmin(r.id)}')" title="Excluir Mesa" aria-label="Excluir reserva da mesa ${escaparHTMLAdmin(r.mesa ?? '')}">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -1209,11 +1218,99 @@ document.addEventListener('change', (event) => {
     }
 });
 
+let idReservaParaExcluir = null;
+
+function solicitarExclusaoReservaAdmin(idReserva) {
+    if (!adminAutenticado) return;
+    const reserva = getReservasAtivasAdmin().find(r => String(r.id) === String(idReserva));
+    if (!reserva) {
+        mostrarPopupNotificacao('Reserva não encontrada.', 'fa-triangle-exclamation');
+        return;
+    }
+
+    idReservaParaExcluir = idReserva;
+
+    const modal = document.getElementById('admin-delete-modal');
+    const infoContainer = document.getElementById('admin-delete-reserva-info');
+    const erroContainer = document.getElementById('admin-delete-error');
+    const btnConfirmar = document.getElementById('admin-btn-confirm-delete');
+
+    if (erroContainer) erroContainer.textContent = '';
+    if (btnConfirmar) {
+        btnConfirmar.disabled = false;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-trash-can"></i> Sim, Excluir';
+    }
+
+    const total = getTotalPessoasReservaAdmin(reserva);
+    if (infoContainer) {
+        infoContainer.innerHTML = `
+            <div><strong>Cliente:</strong> ${escaparHTMLAdmin(reserva.nome || 'Sem nome')}</div>
+            <div><strong>Mesa:</strong> Mesa ${escaparHTMLAdmin(reserva.mesa ?? '-')} &bull; <strong>Horário:</strong> ${escaparHTMLAdmin(reserva.horario || '--:--')}</div>
+            <div><strong>Data:</strong> ${escaparHTMLAdmin(formatarDataBR(reserva.data))} &bull; <strong>Total:</strong> ${total} pessoa(s)</div>
+        `;
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+}
+
+function fecharModalExclusaoAdmin() {
+    const modal = document.getElementById('admin-delete-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    idReservaParaExcluir = null;
+}
+
+async function confirmarExclusaoReservaAdmin() {
+    if (!idReservaParaExcluir) return;
+
+    const id = idReservaParaExcluir;
+    const btn = document.getElementById('admin-btn-confirm-delete');
+    const erro = document.getElementById('admin-delete-error');
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> EXCLUINDO...';
+    }
+
+    try {
+        await dbRef.child('reservas').child(id).remove();
+        
+        // Remove também da lista local para resposta imediata
+        estadoGlobal.reservas = estadoGlobal.reservas.filter(r => String(r.id) !== String(id));
+
+        fecharModalExclusaoAdmin();
+        renderAdminCalendario();
+        renderAdminReservas();
+        atualizarSelectMesas();
+        renderCalendarioCliente();
+
+        mostrarPopupNotificacao('Reserva de mesa excluída com sucesso!', 'fa-trash-can');
+    } catch (error) {
+        if (erro) erro.textContent = 'Erro ao excluir reserva: ' + (error.message || error);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Sim, Excluir';
+        }
+    }
+}
+
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
-        const modal = document.getElementById('admin-edit-modal');
-        if (modal && !modal.classList.contains('hidden')) {
+        const editModal = document.getElementById('admin-edit-modal');
+        if (editModal && !editModal.classList.contains('hidden')) {
             fecharEdicaoReservaAdmin();
+        }
+        const deleteModal = document.getElementById('admin-delete-modal');
+        if (deleteModal && !deleteModal.classList.contains('hidden')) {
+            fecharModalExclusaoAdmin();
+        }
+        const pinModal = document.getElementById('admin-pin-modal');
+        if (pinModal && !pinModal.classList.contains('hidden')) {
+            fecharPinAdmin();
         }
     }
 });
@@ -1237,13 +1334,3 @@ function atualizarAdminSeAberto() {
     renderAdminCalendario();
     renderAdminReservas();
 }
-
-/* Fecha o acesso administrativo com ESC. */
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-        const modal = document.getElementById("admin-pin-modal");
-        if (modal && !modal.classList.contains("hidden")) {
-            fecharPinAdmin();
-        }
-    }
-});
