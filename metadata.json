@@ -1,0 +1,8 @@
+{
+  "name": "Celeiro - Autorreserva de Mesas",
+  "description": "Sistema de autorreserva de mesas para domingos e feriados no Celeiro Rural com painel administrativo integrado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

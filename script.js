@@ -584,6 +584,7 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
        function reiniciarFormulario() {
            document.getElementById('form-autorreserva').reset();
            validarCapacidadeGrupo();
+           sincronizarCustomSelect('cli-horario');
 
            const campoData = document.getElementById('cli-data');
            campoData.value = obterProximoDomingoLocal();
