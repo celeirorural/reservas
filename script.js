@@ -106,6 +106,9 @@
            inicializarCalendarioCliente();
            inicializarCustomSelect('cli-horario');
            inicializarCustomSelect('cli-mesa');
+           document.getElementById('cli-horario')?.addEventListener('change', () => {
+               atualizarSelectMesas();
+           });
        });
 
        // VALIDAR SE A DATA É DOMINGO OU FERIADO CADASTRADO
@@ -208,7 +211,15 @@
        firebase.initializeApp(firebaseConfig);
        const dbRef = firebase.database().ref('celeiro_reservas_v3');
        
-       let estadoGlobal = { reservas: [], configCasa: { totalMesas: 100, capacidadePessoas: 400 } };
+       let estadoGlobal = {
+           reservas: [],
+           configCasa: { totalMesas: 100, capacidadePessoas: 400, reservasTrancadas: false },
+           bloqueio: {
+               trancado: false,
+               mensagem: "Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.",
+               datasTrancadas: {}
+           }
+       };
        let dadosReservaAtual = null;
 
        firebase.database().ref('.info/connected').on('value', (snap) => {
@@ -225,41 +236,170 @@
            if (dados) {
                estadoGlobal.reservas = dados.reservas ? Object.values(dados.reservas) : [];
                if (dados.configCasa) estadoGlobal.configCasa = dados.configCasa;
+
+               const trancadoGlobal = Boolean(
+                   dados.bloqueio?.trancado ?? dados.configCasa?.reservasTrancadas ?? false
+               );
+               const datasTrancadas = dados.bloqueio?.datasTrancadas || dados.configCasa?.datasTrancadas || {};
+
+               estadoGlobal.bloqueio = {
+                   trancado: trancadoGlobal,
+                   mensagem: dados.bloqueio?.mensagem || "Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.",
+                   datasTrancadas: datasTrancadas
+               };
            } else {
                estadoGlobal.reservas = [];
+               estadoGlobal.bloqueio = { trancado: false, datasTrancadas: {} };
            }
+           atualizarInterfaceBloqueioCliente();
            atualizarSelectMesas();
            renderCalendarioCliente();
            atualizarAdminSeAberto();
        });
 
+       // VERIFICA SE O BLOQUEIO DE RESERVAS ESTÁ ATIVO (GLOBAL OU ESPECÍFICO DE UMA DATA)
+       function verificarSeReservasTrancadas(dataISO) {
+           if (!estadoGlobal?.bloqueio) return false;
+           if (estadoGlobal.bloqueio.trancado === true || estadoGlobal.configCasa?.reservasTrancadas === true) {
+               return true;
+           }
+           if (dataISO && estadoGlobal.bloqueio.datasTrancadas) {
+               const keyOriginal = String(dataISO);
+               const keyUnder = keyOriginal.replace(/-/g, '_');
+               if (estadoGlobal.bloqueio.datasTrancadas[keyOriginal] === true || estadoGlobal.bloqueio.datasTrancadas[keyUnder] === true) {
+                   return true;
+               }
+           }
+           return false;
+       }
+
+       // ATUALIZA A INTERFACE PÚBLICA DO CLIENTE QUANDO O BLOQUEIO MUDA
+       function atualizarInterfaceBloqueioCliente() {
+           const campoData = document.getElementById('cli-data');
+           const dataSelecionada = campoData ? campoData.value : (typeof clienteDataSelecionada !== 'undefined' ? clienteDataSelecionada : '');
+           const estaTrancado = verificarSeReservasTrancadas(dataSelecionada);
+
+           const bannerBloqueio = document.getElementById('container-bloqueio-cliente');
+           const containerHorarioMesa = document.getElementById('container-horario-mesa');
+           const selectHorario = document.getElementById('cli-horario');
+           const selectMesa = document.getElementById('cli-mesa');
+           const btnSubmit = document.getElementById('btn-submit');
+
+           if (bannerBloqueio) {
+               if (estaTrancado) {
+                   bannerBloqueio.classList.remove('hidden');
+               } else {
+                   bannerBloqueio.classList.add('hidden');
+               }
+           }
+
+           if (containerHorarioMesa) {
+               if (estaTrancado) {
+                   containerHorarioMesa.classList.add('hidden');
+               } else {
+                   containerHorarioMesa.classList.remove('hidden');
+               }
+           }
+
+           if (selectHorario) {
+               selectHorario.disabled = estaTrancado;
+           }
+
+           if (selectMesa) {
+               selectMesa.disabled = estaTrancado;
+               if (estaTrancado) {
+                   selectMesa.innerHTML = '<option value="">Reservas encerradas para esta data</option>';
+                   selectMesa.value = '';
+               }
+           }
+
+           sincronizarCustomSelect('cli-horario');
+           sincronizarCustomSelect('cli-mesa');
+
+           if (btnSubmit) {
+               if (estaTrancado) {
+                   btnSubmit.disabled = true;
+                   btnSubmit.classList.add('btn-submit-bloqueado');
+                   btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS • CAPACIDADE LOTADA`;
+               } else {
+                   btnSubmit.disabled = false;
+                   btnSubmit.classList.remove('btn-submit-bloqueado');
+                   btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
+               }
+           }
+       }
+
+       // LIMITE DE MESAS LIVRES EXIBIDAS NA SEQUÊNCIA (3 MESAS)
+       const LIMITE_MESAS_SEQUENCIA = 3;
+
+       // OBTÉM AS PRÓXIMAS MESAS DISPONÍVEIS NA SEQUÊNCIA NUMÉRICA CRESCENTE
+       function obterProximasMesasLivres(dataISO, limite = LIMITE_MESAS_SEQUENCIA) {
+           if (!dataISO) return [];
+           if (verificarSeReservasTrancadas(dataISO)) return [];
+           const totalMesas = estadoGlobal.configCasa?.totalMesas || 100;
+           const reservasDaData = (Array.isArray(estadoGlobal?.reservas) ? estadoGlobal.reservas : []).filter(r => {
+               if (r.data !== dataISO) return false;
+               const status = String(r.status || 'reservada').toLowerCase();
+               return !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(status);
+           });
+
+           const mesasOcupadas = new Set(reservasDaData.map(r => parseInt(r.mesa)).filter(n => !isNaN(n)));
+           const mesasLivres = [];
+
+           for (let i = 1; i <= totalMesas; i++) {
+               if (!mesasOcupadas.has(i)) {
+                   mesasLivres.push(i);
+               }
+           }
+
+           mesasLivres.sort((a, b) => a - b);
+           return typeof limite === 'number' && limite > 0 ? mesasLivres.slice(0, limite) : mesasLivres;
+       }
+
        function atualizarSelectMesas() {
            const selectMesa = document.getElementById('cli-mesa');
-           const dataSelecionada = document.getElementById('cli-data').value;
+           const campoData = document.getElementById('cli-data');
+           if (!selectMesa) return;
+
+           const dataSelecionada = campoData ? campoData.value : '';
            const mesaAtual = selectMesa.value;
 
            selectMesa.innerHTML = '<option value="">selecione o N° da sua mesa</option>';
 
-           if (!dataSelecionada) return;
-
-           const totalMesas = estadoGlobal.configCasa.totalMesas || 100;
-
-           // FILTRA APENAS OCUPAÇÕES DA DATA SELECIONADA
-           const reservasDaData = estadoGlobal.reservas.filter(r => r.data === dataSelecionada);
-
-           for (let i = 1; i <= totalMesas; i++) {
-               const ocupada = reservasDaData.find(r => parseInt(r.mesa) === i);
-               
-               if (!ocupada) {
-                   const opt = document.createElement('option');
-                   opt.value = i;
-                   opt.textContent = `Mesa ${i} • Livre`;
-                   selectMesa.appendChild(opt);
-               }
+           if (!dataSelecionada) {
+               sincronizarCustomSelect('cli-mesa');
+               return;
            }
 
-           if (mesaAtual && Array.from(selectMesa.options).some(o => o.value === mesaAtual)) {
+           // SE AS RESERVAS ESTIVEREM TRANCADAS PARA ESTA DATA, NÃO EXIBE NÚMEROS DE MESAS
+           if (verificarSeReservasTrancadas(dataSelecionada)) {
+               selectMesa.innerHTML = '<option value="">Reservas encerradas para esta data</option>';
+               selectMesa.value = '';
+               selectMesa.disabled = true;
+               sincronizarCustomSelect('cli-mesa');
+               return;
+           }
+
+           selectMesa.disabled = false;
+
+           // OBTÉM APENAS AS PRÓXIMAS MESAS DISPONÍVEIS NA SEQUÊNCIA (3 MESAS)
+           const proximasMesas = obterProximasMesasLivres(dataSelecionada, LIMITE_MESAS_SEQUENCIA);
+
+           if (proximasMesas.length === 0) {
+               selectMesa.innerHTML = '<option value="">Nenhuma mesa disponível para esta data</option>';
+           } else {
+               proximasMesas.forEach(mesaNum => {
+                   const opt = document.createElement('option');
+                   opt.value = mesaNum;
+                   opt.textContent = `Mesa ${mesaNum} • Livre`;
+                   selectMesa.appendChild(opt);
+               });
+           }
+
+           if (mesaAtual && proximasMesas.includes(parseInt(mesaAtual))) {
                selectMesa.value = mesaAtual;
+           } else {
+               selectMesa.value = '';
            }
            sincronizarCustomSelect('cli-mesa');
        }
@@ -337,6 +477,7 @@ function irParaMesAtualCliente(){
     const atual=campo?.value;
     clienteDataSelecionada=ehDataPermitidaCliente(atual)?atual:obterProximaDataPermitidaCliente(hoje);
     if(campo) campo.value=clienteDataSelecionada;
+    atualizarInterfaceBloqueioCliente();
     atualizarSelectMesas();
     renderCalendarioCliente();
 }
@@ -348,6 +489,7 @@ function selecionarDataCliente(iso){
     if(campo) campo.value=iso;
     const d=dataLocalPorISO(iso);
     if(d) clienteMesAtual=new Date(d.getFullYear(),d.getMonth(),1);
+    atualizarInterfaceBloqueioCliente();
     atualizarSelectMesas();
     renderCalendarioCliente();
 }
@@ -378,12 +520,13 @@ function renderCalendarioCliente(){
         const iso=obterDataFormatadaISO(d);
         const permitido=ehDataPermitidaCliente(iso);
         const feriado=feriadosPermitidos.includes(iso);
+        const trancado=permitido && verificarSeReservasTrancadas(iso);
         const reservas=getReservasDaDataCliente(iso);
         const hojeISO=obterDataFormatadaISO(hoje);
-        const classes=['client-day',permitido?'valid':'',feriado?'feriado':'',iso===clienteDataSelecionada?'selected':'',iso===hojeISO?'today':'',d<new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())?'past':''].filter(Boolean).join(' ');
-        const label=feriado?'<span class="client-day-label">FERIADO</span>':'';
+        const classes=['client-day',permitido?'valid':'',feriado?'feriado':'',trancado?'lotado':'',iso===clienteDataSelecionada?'selected':'',iso===hojeISO?'today':'',d<new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())?'past':''].filter(Boolean).join(' ');
+        const label=feriado?'<span class="client-day-label">FERIADO</span>':(trancado?'<span class="client-day-label" style="background:rgba(224,130,63,0.3);color:var(--terracota-sol);">LOTADO</span>':'');
         const badge=reservas.length?`<span class="client-day-reservas">${reservas.length}</span>`:'';
-        html+=`<button type="button" class="${classes}" ${permitido?`onclick="selecionarDataCliente('${iso}')"`: 'disabled'} aria-label="${permitido?'Selecionar '+formatarDataBR(iso):'Data indisponível'}"><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
+        html+=`<button type="button" class="${classes}" ${permitido?`onclick="selecionarDataCliente('${iso}')"`: 'disabled'} aria-label="${permitido?'Selecionar '+formatarDataBR(iso)+(trancado?' (Lotado)':''):'Data indisponível'}"><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
     }
     grid.innerHTML=html;
 }
@@ -397,6 +540,7 @@ function inicializarCalendarioCliente(){
     campo.value=inicial;
     const d=dataLocalPorISO(inicial) || hoje;
     clienteMesAtual=new Date(d.getFullYear(),d.getMonth(),1);
+    atualizarInterfaceBloqueioCliente();
     renderCalendarioCliente();
     atualizarSelectMesas();
 }
@@ -485,6 +629,15 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
            const mesaNum = parseInt(document.getElementById('cli-mesa').value);
            const obs = document.getElementById('cli-obs').value.trim();
 
+           // VERIFICAÇÃO SE AS RESERVAS ESTÃO TRANCADAS
+           if (verificarSeReservasTrancadas(dataReserva)) {
+               alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
+               atualizarInterfaceBloqueioCliente();
+               btnSubmit.disabled = true;
+               btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
+               return;
+           }
+
            const totalNovasPessoas = adultos + kids05 + kids610;
 
            if (totalNovasPessoas <= 0) {
@@ -508,8 +661,18 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
                return;
            }
 
+           // VERIFICAÇÃO SE A MESA ESTÁ ENTRE AS PRÓXIMAS LIVRES NA SEQUÊNCIA
+           const proximasPermitidas = obterProximasMesasLivres(dataReserva, LIMITE_MESAS_SEQUENCIA);
+           if (!proximasPermitidas.includes(mesaNum)) {
+               alert("A mesa selecionada não está disponível na sequência permitida. Por favor, escolha uma das próximas mesas disponíveis.");
+               atualizarSelectMesas();
+               btnSubmit.disabled = false;
+               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
+               return;
+           }
+
            // VERIFICAÇÃO DE MESA OCUPADA NA MESMA DATA
-           const mesaOcupada = estadoGlobal.reservas.find(r => r.data === dataReserva && parseInt(r.mesa) === mesaNum);
+           const mesaOcupada = estadoGlobal.reservas.find(r => r.data === dataReserva && parseInt(r.mesa) === mesaNum && !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(String(r.status || '').toLowerCase()));
            if (mesaOcupada) {
                alert(`A Mesa ${mesaNum} acabou de ser reservada para este dia por outro cliente. Por favor, escolha outra mesa.`);
                atualizarSelectMesas();
@@ -544,6 +707,15 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
                obs: obs,
                status: 'reservada'
            };
+
+           // VERIFICAÇÃO FINAL ANTES DE GRAVAR NO BANCO DE DADOS
+           if (verificarSeReservasTrancadas(dataReserva)) {
+               alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
+               atualizarInterfaceBloqueioCliente();
+               btnSubmit.disabled = true;
+               btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
+               return;
+           }
 
            dbRef.child('reservas').child(idReserva).set(novaReserva)
                .then(() => {
@@ -726,6 +898,7 @@ function abrirAreaAdmin() {
 
     document.querySelector(".wsp-float")?.classList.add("hidden");
 
+    atualizarStatusBloqueioAdmin();
     renderAdminCalendario();
     renderAdminReservas();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -736,6 +909,262 @@ function fecharAreaAdmin() {
     document.getElementById("secao-formulario").classList.remove("hidden");
     document.querySelector(".wsp-float")?.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ============================================================
+   CONTROLE DE BLOQUEIO / TRANCAMENTO DE RESERVAS — ADMIN
+   ============================================================ */
+let pendenteAcaoBloqueio = null;
+
+function abrirModalConfirmacaoBloqueio(tipo = 'global') {
+    if (!adminAutenticado) {
+        alert("Ação não autorizada. Acesse a área administrativa com o PIN.");
+        return;
+    }
+
+    const modal = document.getElementById('admin-lock-modal');
+    const title = document.getElementById('admin-lock-modal-title');
+    const desc = document.getElementById('admin-lock-modal-desc');
+    const icon = document.getElementById('admin-lock-modal-icon');
+    const iconWrapper = document.getElementById('admin-lock-icon-wrapper');
+    const eyebrow = document.getElementById('admin-lock-modal-eyebrow');
+    const erroEl = document.getElementById('admin-lock-error');
+    const btnConfirm = document.getElementById('admin-btn-confirm-lock');
+
+    if (!modal || !title || !desc || !btnConfirm) return;
+    if (erroEl) erroEl.textContent = '';
+
+    if (tipo === 'global') {
+        const estaTrancado = Boolean(estadoGlobal.bloqueio?.trancado);
+        const novoEstado = !estaTrancado;
+        pendenteAcaoBloqueio = { tipo: 'global', novoEstado: novoEstado };
+
+        if (novoEstado) {
+            if (eyebrow) {
+                eyebrow.textContent = "Confirmar ação";
+                eyebrow.style.color = "var(--terracota-sol)";
+            }
+            title.textContent = "Trancar Todas as Reservas";
+            desc.textContent = "Tem certeza de que deseja trancar as reservas? Os clientes verão o aviso 'Capacidade lotada para este dia' e novas autorreservas serão bloqueadas imediatamente em tempo real.";
+            if (icon) icon.className = "fa-solid fa-lock";
+            if (iconWrapper) {
+                iconWrapper.style.color = "var(--terracota-sol)";
+                iconWrapper.style.background = "rgba(224, 130, 63, 0.18)";
+            }
+            btnConfirm.className = "admin-delete-confirm-btn";
+            btnConfirm.style.background = "linear-gradient(135deg, #A85A2A 0%, #853F18 100%)";
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock"></i> Sim, Trancar Reservas`;
+        } else {
+            if (eyebrow) {
+                eyebrow.textContent = "Confirmar liberação";
+                eyebrow.style.color = "var(--verde-vibrante)";
+            }
+            title.textContent = "Destrancar Reservas";
+            desc.textContent = "Deseja liberar as reservas novamente? A página pública voltará a exibir as mesas disponíveis e permitirá novas reservas conforme a capacidade existente.";
+            if (icon) icon.className = "fa-solid fa-lock-open";
+            if (iconWrapper) {
+                iconWrapper.style.color = "var(--verde-vibrante)";
+                iconWrapper.style.background = "rgba(16, 185, 129, 0.18)";
+            }
+            btnConfirm.className = "btn-action";
+            btnConfirm.style.background = "linear-gradient(135deg, #2E5A44 0%, #1E3D2E 100%)";
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock-open"></i> Sim, Destrancar Reservas`;
+        }
+    } else if (tipo === 'data') {
+        const dataISO = adminDataSelecionada;
+        if (!dataISO) {
+            alert("Por favor, selecione uma data no calendário primeiro.");
+            return;
+        }
+        const dataKey = dataISO.replace(/-/g, '_');
+        const estaDataTrancada = Boolean(
+            estadoGlobal.bloqueio?.datasTrancadas?.[dataKey] || estadoGlobal.bloqueio?.datasTrancadas?.[dataISO]
+        );
+        const novoEstado = !estaDataTrancada;
+        pendenteAcaoBloqueio = { tipo: 'data', novoEstado: novoEstado, dataISO: dataISO };
+        const dataFormatada = formatarDataBR(dataISO);
+
+        if (novoEstado) {
+            if (eyebrow) {
+                eyebrow.textContent = "Bloqueio por data";
+                eyebrow.style.color = "var(--terracota-sol)";
+            }
+            title.textContent = `Trancar Reservas de ${dataFormatada}`;
+            desc.textContent = `Deseja trancar novas reservas especificamente para o dia ${dataFormatada}? Clientes que selecionarem essa data verão a mensagem de capacidade lotada.`;
+            if (icon) icon.className = "fa-solid fa-lock";
+            if (iconWrapper) {
+                iconWrapper.style.color = "var(--terracota-sol)";
+                iconWrapper.style.background = "rgba(224, 130, 63, 0.18)";
+            }
+            btnConfirm.className = "admin-delete-confirm-btn";
+            btnConfirm.style.background = "linear-gradient(135deg, #A85A2A 0%, #853F18 100%)";
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock"></i> Trancar Esta Data`;
+        } else {
+            if (eyebrow) {
+                eyebrow.textContent = "Liberação por data";
+                eyebrow.style.color = "var(--verde-vibrante)";
+            }
+            title.textContent = `Liberar Reservas de ${dataFormatada}`;
+            desc.textContent = `Deseja liberar as reservas para o dia ${dataFormatada}? A página pública voltará a permitir agendamentos para essa data.`;
+            if (icon) icon.className = "fa-solid fa-lock-open";
+            if (iconWrapper) {
+                iconWrapper.style.color = "var(--verde-vibrante)";
+                iconWrapper.style.background = "rgba(16, 185, 129, 0.18)";
+            }
+            btnConfirm.className = "btn-action";
+            btnConfirm.style.background = "linear-gradient(135deg, #2E5A44 0%, #1E3D2E 100%)";
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock-open"></i> Liberar Esta Data`;
+        }
+    }
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+}
+
+function fecharModalBloqueioAdmin() {
+    const modal = document.getElementById('admin-lock-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('modal-open');
+    pendenteAcaoBloqueio = null;
+}
+
+async function confirmarAlteracaoBloqueioAdmin() {
+    if (!adminAutenticado) {
+        alert("Ação não autorizada. Acesse a área administrativa com o PIN.");
+        fecharModalBloqueioAdmin();
+        return;
+    }
+    if (!pendenteAcaoBloqueio) return;
+
+    const btnConfirm = document.getElementById('admin-btn-confirm-lock');
+    const erroEl = document.getElementById('admin-lock-error');
+    if (btnConfirm) {
+        btnConfirm.disabled = true;
+        btnConfirm.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Atualizando Firebase...`;
+    }
+
+    try {
+        if (pendenteAcaoBloqueio.tipo === 'global') {
+            const novo = pendenteAcaoBloqueio.novoEstado;
+            const agora = new Date().toISOString();
+            await Promise.all([
+                dbRef.child('bloqueio').child('trancado').set(novo),
+                dbRef.child('bloqueio').child('mensagem').set("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão."),
+                dbRef.child('bloqueio').child('atualizadoEm').set(agora),
+                dbRef.child('bloqueio').child('atualizadoPor').set('admin'),
+                dbRef.child('configCasa').child('reservasTrancadas').set(novo)
+            ]);
+
+            fecharModalBloqueioAdmin();
+            mostrarPopupNotificacao(
+                novo ? "Reservas trancadas com sucesso!" : "Reservas liberadas com sucesso!",
+                novo ? "fa-lock" : "fa-lock-open"
+            );
+        } else if (pendenteAcaoBloqueio.tipo === 'data' && pendenteAcaoBloqueio.dataISO) {
+            const dataISO = pendenteAcaoBloqueio.dataISO;
+            const key = dataISO.replace(/-/g, '_');
+            const novo = pendenteAcaoBloqueio.novoEstado;
+
+            await Promise.all([
+                dbRef.child('bloqueio').child('datasTrancadas').child(key).set(novo),
+                dbRef.child('configCasa').child('datasTrancadas').child(key).set(novo)
+            ]);
+
+            fecharModalBloqueioAdmin();
+            mostrarPopupNotificacao(
+                novo ? `Data ${formatarDataBR(dataISO)} trancada!` : `Data ${formatarDataBR(dataISO)} liberada!`,
+                novo ? "fa-lock" : "fa-lock-open"
+            );
+        }
+
+        atualizarStatusBloqueioAdmin();
+        atualizarInterfaceBloqueioCliente();
+        atualizarSelectMesas();
+        renderAdminCalendario();
+        renderAdminReservas();
+    } catch (erro) {
+        console.error("Erro ao alterar bloqueio:", erro);
+        if (erroEl) erroEl.textContent = "Erro ao sincronizar com o Firebase: " + (erro.message || erro);
+        else alert("Erro ao atualizar o Firebase: " + (erro.message || erro));
+    } finally {
+        if (btnConfirm) btnConfirm.disabled = false;
+    }
+}
+
+function atualizarStatusBloqueioAdmin() {
+    if (!adminAutenticado) return;
+
+    const estaTrancado = Boolean(estadoGlobal.bloqueio?.trancado);
+    const badge = document.getElementById('admin-lock-badge');
+    const btnToggle = document.getElementById('admin-btn-toggle-bloqueio');
+    const infoText = document.getElementById('admin-lock-info-text');
+
+    if (badge) {
+        if (estaTrancado) {
+            badge.className = "admin-lock-badge badge-trancado";
+            badge.innerHTML = `<i class="fa-solid fa-lock"></i> Reservas Trancadas`;
+        } else {
+            badge.className = "admin-lock-badge badge-liberado";
+            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Reservas Liberadas`;
+        }
+    }
+
+    if (btnToggle) {
+        if (estaTrancado) {
+            btnToggle.className = "admin-lock-toggle-btn btn-destrancar";
+            btnToggle.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Destrancar Reservas</span>`;
+            btnToggle.title = "Clique para liberar as reservas para o público";
+        } else {
+            btnToggle.className = "admin-lock-toggle-btn btn-trancar";
+            btnToggle.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Trancar Reservas</span>`;
+            btnToggle.title = "Clique para trancar e impedir novas reservas";
+        }
+    }
+
+    if (infoText) {
+        if (estaTrancado) {
+            infoText.innerHTML = `⚠️ <strong>Bloqueio ativo no sistema:</strong> A página pública exibe o aviso <em>"Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão."</em> e impede seleção de mesas e horários.`;
+        } else {
+            infoText.textContent = `Quando as reservas estiverem trancadas, a página pública oculta mesas e horários e exibe o aviso de capacidade lotada em tempo real.`;
+        }
+    }
+
+    // Status da data selecionada na lista
+    const dataSelecionada = adminDataSelecionada;
+    const badgeData = document.getElementById('admin-date-lock-status');
+    const btnData = document.getElementById('admin-btn-toggle-date-lock');
+
+    if (dataSelecionada && badgeData && btnData) {
+        btnData.classList.remove('hidden');
+        const dataKey = dataSelecionada.replace(/-/g, '_');
+        const estaDataTrancada = Boolean(
+            estadoGlobal.bloqueio?.datasTrancadas?.[dataKey] || estadoGlobal.bloqueio?.datasTrancadas?.[dataSelecionada]
+        );
+
+        if (estaTrancado) {
+            badgeData.className = "admin-date-lock-status trancada";
+            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Trancada (Geral)`;
+            btnData.disabled = true;
+            btnData.title = "O bloqueio geral do sistema já está trancando todas as datas";
+            btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Bloqueio geral ativo</span>`;
+        } else if (estaDataTrancada) {
+            badgeData.className = "admin-date-lock-status trancada";
+            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Data Trancada`;
+            btnData.disabled = false;
+            btnData.title = "Clique para liberar esta data específica";
+            btnData.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Liberar data</span>`;
+        } else {
+            badgeData.className = "admin-date-lock-status liberada";
+            badgeData.innerHTML = `<i class="fa-solid fa-circle-check"></i> Data Liberada`;
+            btnData.disabled = false;
+            btnData.title = "Clique para trancar esta data específica";
+            btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Trancar data</span>`;
+        }
+    }
 }
 
 function ehDataPermitidaAdmin(dataISO) {
@@ -890,6 +1319,8 @@ function renderAdminReservas() {
     const contador = document.getElementById("admin-selected-count");
 
     if (!lista || !titulo || !contador) return;
+
+    atualizarStatusBloqueioAdmin();
 
     const data = adminDataSelecionada;
     const reservas = getReservasDaDataAdmin(data);
@@ -1312,6 +1743,10 @@ document.addEventListener('keydown', (event) => {
         if (pinModal && !pinModal.classList.contains('hidden')) {
             fecharPinAdmin();
         }
+        const lockModal = document.getElementById('admin-lock-modal');
+        if (lockModal && !lockModal.classList.contains('hidden')) {
+            fecharModalBloqueioAdmin();
+        }
     }
 });
 
@@ -1331,6 +1766,7 @@ function atualizarAdminSeAberto() {
     const secao = document.getElementById("secao-admin");
     if (!secao || secao.classList.contains("hidden")) return;
 
+    atualizarStatusBloqueioAdmin();
     renderAdminCalendario();
     renderAdminReservas();
 }

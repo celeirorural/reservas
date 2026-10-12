@@ -110,7 +110,18 @@
                        </div>
                    </div>
 
-                   <div class="form-row-double client-time-row">
+                   <!-- MENSAGEM DE CAPACIDADE LOTADA (EXIBIDA QUANDO TRANCADO) -->
+                   <div id="container-bloqueio-cliente" class="banner-bloqueio-reservas hidden" role="alert" aria-live="polite">
+                       <div class="banner-bloqueio-icon">
+                           <i class="fa-solid fa-lock"></i>
+                       </div>
+                       <div class="banner-bloqueio-texto">
+                           <h3 class="banner-bloqueio-titulo">Capacidade Esgotada</h3>
+                           <p class="banner-bloqueio-mensagem">Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.</p>
+                       </div>
+                   </div>
+
+                   <div class="form-row-double client-time-row" id="container-horario-mesa">
                        <div class="input-group">
                            <label>Horário da Reserva</label>
                            <select id="cli-horario" class="native-custom-select" aria-hidden="true" tabindex="-1" required>
@@ -254,6 +265,27 @@
                 </button>
             </div>
 
+            <!-- CARD DE CONTROLE DE TRANCAMENTO DE RESERVAS -->
+            <div class="card admin-lock-card" id="admin-lock-card">
+                <div class="admin-lock-header">
+                    <div class="admin-lock-title-group">
+                        <span class="admin-eyebrow"><i class="fa-solid fa-shield-halved"></i> Controle de Disponibilidade Geral</span>
+                        <div class="admin-lock-status-indicator">
+                            <span class="admin-lock-label">Status das Reservas:</span>
+                            <span id="admin-lock-badge" class="admin-lock-badge badge-liberado">
+                                <i class="fa-solid fa-circle-check"></i> Reservas Liberadas
+                            </span>
+                        </div>
+                    </div>
+                    <button type="button" id="admin-btn-toggle-bloqueio" class="admin-lock-toggle-btn btn-trancar" onclick="abrirModalConfirmacaoBloqueio('global')">
+                        <i class="fa-solid fa-lock"></i> <span>Trancar Reservas</span>
+                    </button>
+                </div>
+                <p class="admin-lock-info-text" id="admin-lock-info-text">
+                    Quando as reservas estiverem trancadas, a página pública oculta mesas e horários e exibe o aviso de capacidade lotada em tempo real.
+                </p>
+            </div>
+
             <div class="admin-summary-grid">
                 <div class="admin-stat">
                     <span class="admin-stat-number" id="admin-total-reservas">0</span>
@@ -307,7 +339,13 @@
                         <span class="admin-calendar-caption">Data selecionada</span>
                         <h3 id="admin-selected-date-title">-</h3>
                     </div>
-                    <span id="admin-selected-count" class="admin-count-badge">0 reservas</span>
+                    <div class="admin-date-lock-wrap">
+                        <span id="admin-date-lock-status" class="admin-date-lock-status liberada"></span>
+                        <button type="button" id="admin-btn-toggle-date-lock" class="admin-date-lock-btn" onclick="abrirModalConfirmacaoBloqueio('data')" title="Trancar ou liberar reservas desta data">
+                            <i class="fa-solid fa-lock"></i> <span>Trancar data</span>
+                        </button>
+                        <span id="admin-selected-count" class="admin-count-badge">0 reservas</span>
+                    </div>
                 </div>
 
                 <div class="admin-search">
@@ -402,6 +440,38 @@
                     <button type="button" class="admin-edit-cancel" onclick="fecharEdicaoReservaAdmin()">Cancelar</button>
                     <button type="button" class="btn-action admin-edit-save" id="admin-edit-save" onclick="salvarEdicaoReservaAdmin()">
                         <i class="fa-solid fa-floppy-disk"></i> SALVAR ALTERAÇÕES
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL DE CONFIRMAÇÃO DE BLOQUEIO / DESBLOQUEIO DE RESERVAS -->
+        <div id="admin-lock-modal" class="admin-modal hidden" aria-hidden="true" role="dialog" aria-labelledby="admin-lock-modal-title">
+            <div class="admin-modal-backdrop" onclick="fecharModalBloqueioAdmin()"></div>
+            <div class="admin-delete-box admin-lock-modal-box">
+                <button type="button" class="admin-pin-close" onclick="fecharModalBloqueioAdmin()" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="admin-delete-icon-wrapper" id="admin-lock-icon-wrapper">
+                    <i class="fa-solid fa-lock" id="admin-lock-modal-icon"></i>
+                </div>
+
+                <span class="admin-eyebrow" id="admin-lock-modal-eyebrow" style="color: var(--terracota-sol);">Confirmar ação</span>
+                <h3 id="admin-lock-modal-title">Trancar Reservas</h3>
+
+                <p class="admin-delete-question" id="admin-lock-modal-desc">
+                    Tem certeza de que deseja trancar as reservas? Os clientes verão o aviso de capacidade lotada e não poderão selecionar mesas.
+                </p>
+
+                <div id="admin-lock-error" class="admin-pin-error"></div>
+
+                <div class="admin-delete-actions">
+                    <button type="button" class="admin-delete-cancel" onclick="fecharModalBloqueioAdmin()">
+                        Cancelar
+                    </button>
+                    <button type="button" class="admin-delete-confirm-btn" id="admin-btn-confirm-lock" onclick="confirmarAlteracaoBloqueioAdmin()">
+                        <i class="fa-solid fa-lock"></i> Confirmar
                     </button>
                 </div>
             </div>

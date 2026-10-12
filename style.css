@@ -1550,3 +1550,257 @@ body.modal-open{overflow:hidden;}
     .group-limit-box h3{font-size:1.28rem;}
 }
 @media(max-width:360px){.brand-logo{width:132px;height:52px}.card{padding:19px 15px}.custom-select-trigger{font-size:.88rem}}
+
+/* ============================================================
+   ESTILOS DE BLOQUEIO / TRANCAMENTO DE RESERVAS
+   ============================================================ */
+
+/* Mensagem de Capacidade Lotada no lado do cliente */
+.banner-bloqueio-reservas {
+    background: linear-gradient(135deg, rgba(224, 130, 63, 0.12) 0%, rgba(26, 26, 23, 0.95) 100%);
+    border: 1px solid rgba(224, 130, 63, 0.42);
+    border-radius: var(--curva);
+    padding: 24px 20px;
+    margin: 16px 0 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    animation: fadeIn 0.35s ease-out forwards;
+}
+
+.banner-bloqueio-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(224, 130, 63, 0.18);
+    border: 1px solid rgba(224, 130, 63, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--terracota-sol);
+    font-size: 1.35rem;
+    box-shadow: 0 0 22px rgba(224, 130, 63, 0.28);
+}
+
+.banner-bloqueio-texto {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 520px;
+}
+
+.banner-bloqueio-titulo {
+    font-family: 'Oswald', sans-serif;
+    color: var(--terracota-sol);
+    font-size: 1.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0;
+}
+
+.banner-bloqueio-mensagem {
+    color: var(--texto-branco);
+    font-size: 0.96rem;
+    font-weight: 500;
+    line-height: 1.55;
+    margin: 0;
+}
+
+/* Botão de envio desabilitado por trancamento */
+.btn-submit-bloqueado {
+    background: #232320 !important;
+    color: #8E8E8A !important;
+    border: 1px solid rgba(224, 130, 63, 0.25) !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 0.85;
+}
+
+/* Card de Controle de Bloqueio na Administração */
+.admin-lock-card {
+    background: radial-gradient(circle at top right, rgba(197, 160, 89, 0.08), transparent 45%), var(--bg-card);
+    border: 1px solid var(--borda);
+    border-radius: var(--curva);
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.admin-lock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.admin-lock-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-lock-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-lock-label {
+    font-size: 0.85rem;
+    color: var(--texto-cinza);
+    font-weight: 500;
+}
+
+.admin-lock-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    transition: var(--transicao);
+}
+
+.admin-lock-badge.badge-liberado {
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: var(--verde-vibrante);
+}
+
+.admin-lock-badge.badge-trancado {
+    background: rgba(224, 130, 63, 0.16);
+    border: 1px solid rgba(224, 130, 63, 0.45);
+    color: var(--terracota-sol);
+    animation: pulseBadge 2.2s infinite ease-in-out;
+}
+
+@keyframes pulseBadge {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(224, 130, 63, 0.35); }
+    50% { box-shadow: 0 0 0 6px rgba(224, 130, 63, 0); }
+}
+
+.admin-lock-info-text {
+    font-size: 0.82rem;
+    color: var(--texto-cinza);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.admin-lock-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 10px 20px;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transicao);
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-lock-toggle-btn.btn-trancar {
+    background: linear-gradient(135deg, #A85A2A 0%, #853F18 100%);
+    color: #FFFFFF;
+    border: 1px solid rgba(224, 130, 63, 0.55);
+    box-shadow: 0 4px 14px rgba(168, 90, 42, 0.35);
+}
+
+.admin-lock-toggle-btn.btn-trancar:hover {
+    background: linear-gradient(135deg, #BD6732 0%, #994A1F 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(168, 90, 42, 0.45);
+}
+
+.admin-lock-toggle-btn.btn-destrancar {
+    background: linear-gradient(135deg, #2E5A44 0%, #1E3D2E 100%);
+    color: #FFFFFF;
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    box-shadow: 0 4px 14px rgba(46, 90, 68, 0.35);
+}
+
+.admin-lock-toggle-btn.btn-destrancar:hover {
+    background: linear-gradient(135deg, #3A7055 0%, #254D3A 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+}
+
+/* Indicadores de Bloqueio por Data na Área Admin */
+.admin-date-lock-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-date-lock-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.admin-date-lock-status.liberada {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--verde-vibrante);
+}
+
+.admin-date-lock-status.trancada {
+    background: rgba(224, 130, 63, 0.15);
+    border: 1px solid rgba(224, 130, 63, 0.4);
+    color: var(--terracota-sol);
+}
+
+.admin-date-lock-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--borda);
+    color: var(--texto-branco);
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transicao);
+}
+
+.admin-date-lock-btn:hover:not(:disabled) {
+    background: rgba(197, 160, 89, 0.12);
+    border-color: var(--borda-foco);
+    color: var(--bronze-hover);
+}
+
+.admin-date-lock-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Modal de Bloqueio */
+.admin-lock-modal-box {
+    max-width: 440px;
+}
+
