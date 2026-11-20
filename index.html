@@ -45,8 +45,48 @@
 
    <main class="content-wrapper">
 
+       <!-- TELA INICIAL DE ESCOLHA -->
+       <section id="secao-inicio" class="fade-in">
+           <div class="card home-choice-card">
+               <div class="home-choice-header">
+                   <span class="home-choice-eyebrow"><i class="fa-solid fa-utensils"></i> Celeiro Rural &bull; Autorreservas</span>
+                   <h2>O que você deseja fazer?</h2>
+                   <p>Escolha uma das opções abaixo para realizar uma nova reserva ou cancelar um agendamento existente.</p>
+               </div>
+
+               <div class="home-choice-grid">
+                   <button type="button" class="choice-card-btn choice-agendar" onclick="irParaAgendarReserva()">
+                       <div class="choice-card-icon">
+                           <i class="fa-solid fa-calendar-plus"></i>
+                       </div>
+                       <div class="choice-card-content">
+                           <h3>Agendar reserva</h3>
+                           <p>Escolha a data, o horário e o número da sua mesa disponível.</p>
+                       </div>
+                       <span class="choice-card-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                   </button>
+
+                   <button type="button" class="choice-card-btn choice-cancelar" onclick="irParaCancelarReserva()">
+                       <div class="choice-card-icon">
+                           <i class="fa-solid fa-calendar-xmark"></i>
+                       </div>
+                       <div class="choice-card-content">
+                           <h3>Cancelar reserva</h3>
+                           <p>Localize uma reserva existente pelo nome e mesa para cancelar.</p>
+                       </div>
+                       <span class="choice-card-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                   </button>
+               </div>
+           </div>
+       </section>
+
        <!-- ETAPA DE FORMULÁRIO -->
-       <div id="secao-formulario" class="fade-in">
+       <div id="secao-formulario" class="hidden fade-in">
+           <div class="subpage-nav">
+               <button type="button" class="btn-voltar-inicio" onclick="voltarParaInicio()">
+                   <i class="fa-solid fa-arrow-left"></i> Voltar
+               </button>
+           </div>
            <form id="form-autorreserva">
                
                <!-- PASSO 1 -->
@@ -229,8 +269,76 @@
                <button onclick="reiniciarFormulario()" class="btn-action btn-secundario">
                    <i class="fa-solid fa-plus-circle"></i> CRIAR NOVA RESERVA
                </button>
+
+               <button type="button" onclick="voltarParaInicio()" class="btn-action btn-secundario">
+                   <i class="fa-solid fa-house"></i> VOLTAR AO INÍCIO
+               </button>
            </div>
        </div>
+
+       <!-- TELA DE LOCALIZAÇÃO E CANCELAMENTO DE RESERVA -->
+       <section id="secao-cancelar" class="hidden fade-in">
+           <div class="subpage-nav">
+               <button type="button" class="btn-voltar-inicio" onclick="voltarParaInicio()">
+                   <i class="fa-solid fa-arrow-left"></i> Voltar
+               </button>
+           </div>
+
+           <!-- ETAPA 1: FORMULÁRIO DE BUSCA -->
+           <div id="cancel-busca-card" class="card">
+               <h2><i class="fa-solid fa-calendar-xmark"></i> Localizar minha reserva</h2>
+               <p class="cancel-descricao">Informe os dados utilizados no momento do agendamento para localizar sua reserva.</p>
+
+               <form id="form-buscar-reserva" onsubmit="buscarReservaParaCancelar(event)" novalidate>
+                   <div class="input-group">
+                       <label for="cancel-nome">Nome completo utilizado na reserva</label>
+                       <input type="text" id="cancel-nome" autocomplete="name" placeholder="Digite o nome completo cadastrado" required>
+                   </div>
+
+                   <div class="input-group">
+                       <label for="cancel-mesa">Número da mesa reservada</label>
+                       <input type="number" id="cancel-mesa" min="1" max="500" inputmode="numeric" placeholder="Ex: 5" required>
+                   </div>
+
+                   <div id="cancel-busca-erro" class="cancel-feedback-erro hidden" role="alert"></div>
+
+                   <button type="submit" id="btn-buscar-reserva" class="btn-action">
+                       <i class="fa-solid fa-magnifying-glass"></i> Buscar reserva
+                   </button>
+               </form>
+           </div>
+
+           <!-- ETAPA 2: CONFERÊNCIA DOS DADOS DA RESERVA LOCALIZADA -->
+           <div id="cancel-resultado-card" class="recibo-card cancel-resultado-card hidden">
+               <div class="recibo-header">
+                   <h3><i class="fa-solid fa-clipboard-check"></i> Reserva Localizada</h3>
+                   <div class="recibo-codigo">CONFIRA OS DADOS ANTES DE CANCELAR</div>
+               </div>
+
+               <div id="cancel-detalhes-lista" class="cancel-detalhes-lista"></div>
+
+               <div class="cancel-resultado-actions">
+                   <button type="button" class="btn-action btn-secundario" onclick="voltarParaBuscaCancelamento()">
+                       <i class="fa-solid fa-arrow-left"></i> Voltar
+                   </button>
+                   <button type="button" id="btn-abrir-confirmacao-cancelar" class="btn-action btn-cancelar-reserva" onclick="abrirModalConfirmacaoCancelamento()">
+                       <i class="fa-solid fa-calendar-xmark"></i> Cancelar minha reserva
+                   </button>
+               </div>
+           </div>
+
+           <!-- ETAPA 3: MENSAGEM DE CANCELAMENTO CONCLUÍDO -->
+           <div id="cancel-sucesso-card" class="card cancel-sucesso-card hidden" role="status" aria-live="polite">
+               <div class="cancel-sucesso-icon">
+                   <i class="fa-solid fa-circle-check"></i>
+               </div>
+               <h3>Reserva Cancelada</h3>
+               <p class="cancel-sucesso-msg">Reserva cancelada com sucesso! Esperamos você em uma próxima visita.</p>
+               <button type="button" class="btn-action" onclick="voltarParaInicio()">
+                   <i class="fa-solid fa-house"></i> Voltar ao início
+               </button>
+           </div>
+       </section>
 
    
         <!-- POP-UP PARA GRUPOS ACIMA DE 30 PESSOAS -->
@@ -528,6 +636,38 @@
                 <button type="button" class="btn-action" onclick="verificarPinAdmin()">
                     <i class="fa-solid fa-arrow-right"></i> ACESSAR RESERVAS
                 </button>
+            </div>
+        </div>
+
+        <!-- MODAL DE CONFIRMAÇÃO DE CANCELAMENTO PELO CLIENTE -->
+        <div id="cancel-confirm-modal" class="admin-modal hidden" aria-hidden="true" role="dialog" aria-labelledby="cancel-confirm-title">
+            <div class="admin-modal-backdrop" onclick="fecharModalConfirmacaoCancelamento()"></div>
+            <div class="admin-delete-box">
+                <button type="button" class="admin-pin-close" onclick="fecharModalConfirmacaoCancelamento()" aria-label="Fechar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+
+                <div class="admin-delete-icon-wrapper">
+                    <i class="fa-solid fa-calendar-xmark"></i>
+                </div>
+
+                <span class="admin-eyebrow" style="color: var(--terracota-sol);">Confirmação de cancelamento</span>
+                <h3 id="cancel-confirm-title">Cancelar Reserva</h3>
+
+                <p class="admin-delete-question">Tem certeza que deseja cancelar esta reserva?</p>
+
+                <div id="cancel-confirm-resumo" class="admin-delete-reserva-summary"></div>
+
+                <div id="cancel-confirm-error" class="admin-pin-error"></div>
+
+                <div class="admin-delete-actions">
+                    <button type="button" class="admin-delete-cancel" onclick="fecharModalConfirmacaoCancelamento()">
+                        Não, voltar
+                    </button>
+                    <button type="button" class="admin-delete-confirm-btn" id="btn-confirmar-cancelamento-final" onclick="confirmarCancelamentoCliente()">
+                        <i class="fa-solid fa-calendar-xmark"></i> Sim, cancelar reserva
+                    </button>
+                </div>
             </div>
         </div>
 

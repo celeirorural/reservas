@@ -234,7 +234,13 @@
        dbRef.on('value', (snapshot) => {
            const dados = snapshot.val();
            if (dados) {
-               estadoGlobal.reservas = dados.reservas ? Object.values(dados.reservas) : [];
+               estadoGlobal.reservas = dados.reservas
+                   ? Object.entries(dados.reservas).map(([firebaseKey, item]) => ({
+                       ...(item || {}),
+                       id: item?.id || firebaseKey,
+                       _firebaseKey: firebaseKey
+                   }))
+                   : [];
                if (dados.configCasa) estadoGlobal.configCasa = dados.configCasa;
 
                const trancadoGlobal = Boolean(
@@ -406,8 +412,12 @@
 
        function getPessoasNaData(dataISO) {
            return estadoGlobal.reservas
-               .filter(r => r.data === dataISO)
-               .reduce((total, r) => total + (r.adultos || 0) + (r.kids05 || 0) + (r.kids610 || 0), 0);
+               .filter(r => {
+                   if (r.data !== dataISO) return false;
+                   const status = String(r.status || 'reservada').toLowerCase();
+                   return !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(status);
+               })
+               .reduce((total, r) => total + (Number(r.adultos) || 0) + (Number(r.kids05) || 0) + (Number(r.kids610) || 0), 0);
        }
 
        function formatarDataBR(dataISO) {
@@ -731,6 +741,8 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
        };
 
        function exibirComprovante(reserva) {
+           document.getElementById('secao-inicio')?.classList.add('hidden');
+           document.getElementById('secao-cancelar')?.classList.add('hidden');
            document.getElementById('secao-formulario').classList.add('hidden');
            document.getElementById('secao-comprovante').classList.remove('hidden');
 
@@ -772,6 +784,8 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
            btnSubmit.disabled = false;
            btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
 
+           document.getElementById('secao-inicio')?.classList.add('hidden');
+           document.getElementById('secao-cancelar')?.classList.add('hidden');
            document.getElementById('secao-comprovante').classList.add('hidden');
            document.getElementById('secao-formulario').classList.remove('hidden');
 
@@ -880,6 +894,8 @@ function verificarPinAdmin() {
 function abrirAreaAdmin() {
     if (!adminAutenticado) return;
 
+    document.getElementById("secao-inicio")?.classList.add("hidden");
+    document.getElementById("secao-cancelar")?.classList.add("hidden");
     document.getElementById("secao-formulario").classList.add("hidden");
     document.getElementById("secao-comprovante").classList.add("hidden");
     document.getElementById("secao-admin").classList.remove("hidden");
@@ -906,7 +922,10 @@ function abrirAreaAdmin() {
 
 function fecharAreaAdmin() {
     document.getElementById("secao-admin").classList.add("hidden");
-    document.getElementById("secao-formulario").classList.remove("hidden");
+    document.getElementById("secao-formulario").classList.add("hidden");
+    document.getElementById("secao-cancelar")?.classList.add("hidden");
+    document.getElementById("secao-comprovante").classList.add("hidden");
+    document.getElementById("secao-inicio")?.classList.remove("hidden");
     document.querySelector(".wsp-float")?.classList.remove("hidden");
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -1747,6 +1766,10 @@ document.addEventListener('keydown', (event) => {
         if (lockModal && !lockModal.classList.contains('hidden')) {
             fecharModalBloqueioAdmin();
         }
+        const cancelModal = document.getElementById('cancel-confirm-modal');
+        if (cancelModal && !cancelModal.classList.contains('hidden')) {
+            fecharModalConfirmacaoCancelamento();
+        }
     }
 });
 
@@ -1770,3 +1793,387 @@ function atualizarAdminSeAberto() {
     renderAdminCalendario();
     renderAdminReservas();
 }
+
+/* ============================================================
+   TELA INICIAL E FLUXO DE CANCELAMENTO PELO CLIENTE
+   ============================================================ */
+let reservaSelecionadaParaCancelar = null;
+
+function normalizarTextoBusca(texto) {
+    return String(texto || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function ehStatusReservaAtiva(status) {
+    const s = String(status || 'reservada').toLowerCase();
+    return !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(s);
+}
+
+function voltarParaInicio() {
+    fecharModalConfirmacaoCancelamento();
+    document.getElementById('secao-formulario')?.classList.add('hidden');
+    document.getElementById('secao-comprovante')?.classList.add('hidden');
+    document.getElementById('secao-cancelar')?.classList.add('hidden');
+    document.getElementById('secao-admin')?.classList.add('hidden');
+    document.getElementById('secao-inicio')?.classList.remove('hidden');
+    document.querySelector('.wsp-float')?.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function irParaAgendarReserva() {
+    document.getElementById('secao-inicio')?.classList.add('hidden');
+    document.getElementById('secao-cancelar')?.classList.add('hidden');
+    document.getElementById('secao-comprovante')?.classList.add('hidden');
+    document.getElementById('secao-admin')?.classList.add('hidden');
+    document.getElementById('secao-formulario')?.classList.remove('hidden');
+
+    atualizarInterfaceBloqueioCliente();
+    atualizarSelectMesas();
+    renderCalendarioCliente();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetarTelaCancelamento() {
+    reservaSelecionadaParaCancelar = null;
+    const form = document.getElementById('form-buscar-reserva');
+    if (form) form.reset();
+
+    const erroBox = document.getElementById('cancel-busca-erro');
+    if (erroBox) {
+        erroBox.classList.add('hidden');
+        erroBox.innerHTML = '';
+    }
+
+    document.getElementById('cancel-busca-card')?.classList.remove('hidden');
+    document.getElementById('cancel-resultado-card')?.classList.add('hidden');
+    document.getElementById('cancel-sucesso-card')?.classList.add('hidden');
+}
+
+function irParaCancelarReserva() {
+    resetarTelaCancelamento();
+    document.getElementById('secao-inicio')?.classList.add('hidden');
+    document.getElementById('secao-formulario')?.classList.add('hidden');
+    document.getElementById('secao-comprovante')?.classList.add('hidden');
+    document.getElementById('secao-admin')?.classList.add('hidden');
+    document.getElementById('secao-cancelar')?.classList.remove('hidden');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => document.getElementById('cancel-nome')?.focus(), 120);
+}
+
+function voltarParaBuscaCancelamento() {
+    reservaSelecionadaParaCancelar = null;
+    document.getElementById('cancel-resultado-card')?.classList.add('hidden');
+    document.getElementById('cancel-sucesso-card')?.classList.add('hidden');
+    document.getElementById('cancel-busca-card')?.classList.remove('hidden');
+    setTimeout(() => document.getElementById('cancel-nome')?.focus(), 80);
+}
+
+function exibirErroBuscaCancelamento(mensagem) {
+    const erroBox = document.getElementById('cancel-busca-erro');
+    if (!erroBox) return;
+    erroBox.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i><span>${escaparHTMLAdmin(mensagem)}</span>`;
+    erroBox.classList.remove('hidden');
+}
+
+function ocultarErroBuscaCancelamento() {
+    const erroBox = document.getElementById('cancel-busca-erro');
+    if (!erroBox) return;
+    erroBox.classList.add('hidden');
+    erroBox.innerHTML = '';
+}
+
+function calcularTotalPessoasCancelamento(reserva) {
+    if (!reserva) return null;
+    const temCamposGrupo = (
+        reserva.adultos !== undefined ||
+        reserva.kids05 !== undefined ||
+        reserva.kids610 !== undefined
+    );
+    if (temCamposGrupo) {
+        const adultos = Number(reserva.adultos || 0);
+        const kids05 = Number(reserva.kids05 || 0);
+        const kids610 = Number(reserva.kids610 || 0);
+        const total = adultos + kids05 + kids610;
+        return {
+            total,
+            texto: `${total} ${total === 1 ? 'pessoa' : 'pessoas'} (${adultos} ad, ${kids610} meia, ${kids05} free)`
+        };
+    }
+    if (reserva.pessoas !== undefined || reserva.quantidadePessoas !== undefined) {
+        const total = Number(reserva.pessoas ?? reserva.quantidadePessoas ?? 0);
+        return {
+            total,
+            texto: `${total} ${total === 1 ? 'pessoa' : 'pessoas'}`
+        };
+    }
+    return null;
+}
+
+async function buscarReservaParaCancelar(event) {
+    if (event) event.preventDefault();
+    ocultarErroBuscaCancelamento();
+
+    const inputNome = document.getElementById('cancel-nome');
+    const inputMesa = document.getElementById('cancel-mesa');
+    const btnBuscar = document.getElementById('btn-buscar-reserva');
+
+    const nomeInformado = String(inputNome?.value || '').trim();
+    const mesaRaw = String(inputMesa?.value || '').trim();
+    const mesaNumero = parseInt(mesaRaw, 10);
+
+    if (!nomeInformado) {
+        exibirErroBuscaCancelamento('Por favor, informe o nome completo utilizado na reserva.');
+        inputNome?.focus();
+        return;
+    }
+
+    if (!mesaRaw || isNaN(mesaNumero) || mesaNumero <= 0) {
+        exibirErroBuscaCancelamento('Por favor, informe um número de mesa válido.');
+        inputMesa?.focus();
+        return;
+    }
+
+    if (btnBuscar) {
+        btnBuscar.disabled = true;
+        btnBuscar.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> BUSCANDO RESERVA...';
+    }
+
+    try {
+        let listaReservas = Array.isArray(estadoGlobal?.reservas) ? estadoGlobal.reservas : [];
+
+        // Consulta os registros mais recentes diretamente no Firebase
+        try {
+            const snapshot = await dbRef.child('reservas').once('value');
+            const dados = snapshot.val();
+            if (dados && typeof dados === 'object') {
+                listaReservas = Object.entries(dados).map(([firebaseKey, item]) => ({
+                    ...(item || {}),
+                    id: item?.id || firebaseKey,
+                    _firebaseKey: firebaseKey
+                }));
+                estadoGlobal.reservas = listaReservas;
+            } else if (dados === null) {
+                listaReservas = [];
+                estadoGlobal.reservas = [];
+            }
+        } catch (fbError) {
+            console.warn('Falha ao consultar Firebase diretamente, utilizando estado local sincronizado:', fbError);
+        }
+
+        const nomeNormalizado = normalizarTextoBusca(nomeInformado);
+        const hojeISO = obterDataFormatadaISO(new Date());
+
+        const correspondencias = listaReservas.filter((r) => {
+            if (!r || !ehStatusReservaAtiva(r.status)) return false;
+            const nomeReserva = normalizarTextoBusca(r.nome);
+            const mesaReserva = parseInt(r.mesa, 10);
+            return nomeReserva === nomeNormalizado && !isNaN(mesaReserva) && mesaReserva === mesaNumero;
+        });
+
+        if (!correspondencias.length) {
+            exibirErroBuscaCancelamento('Não encontramos uma reserva com esses dados. Confira o nome e o número da mesa e tente novamente.');
+            return;
+        }
+
+        // Prioriza reservas de hoje ou futuras em ordem cronológica; se todas forem passadas, pega a mais recente
+        correspondencias.sort((a, b) => {
+            const dataA = String(a.data || '');
+            const dataB = String(b.data || '');
+            const aFutura = dataA >= hojeISO;
+            const bFutura = dataB >= hojeISO;
+            if (aFutura && !bFutura) return -1;
+            if (!aFutura && bFutura) return 1;
+            if (aFutura && bFutura) return dataA.localeCompare(dataB);
+            return dataB.localeCompare(dataA);
+        });
+
+        const reservaEncontrada = correspondencias[0];
+        reservaSelecionadaParaCancelar = reservaEncontrada;
+        exibirResultadoReservaCancelamento(reservaEncontrada);
+    } finally {
+        if (btnBuscar) {
+            btnBuscar.disabled = false;
+            btnBuscar.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Buscar reserva';
+        }
+    }
+}
+
+function exibirResultadoReservaCancelamento(reserva) {
+    const listaEl = document.getElementById('cancel-detalhes-lista');
+    if (!listaEl || !reserva) return;
+
+    const linhas = [];
+
+    linhas.push(`
+        <div class="recibo-linha">
+            <span class="rotulo">Nome do cliente:</span>
+            <span class="valor">${escaparHTMLAdmin(reserva.nome || '-')}</span>
+        </div>
+    `);
+
+    linhas.push(`
+        <div class="recibo-linha">
+            <span class="rotulo">Número da mesa:</span>
+            <span class="valor recibo-destaque">Mesa ${escaparHTMLAdmin(reserva.mesa ?? '-')}</span>
+        </div>
+    `);
+
+    if (reserva.data) {
+        linhas.push(`
+            <div class="recibo-linha">
+                <span class="rotulo">Data da reserva:</span>
+                <span class="valor">${escaparHTMLAdmin(formatarDataBR(reserva.data))}</span>
+            </div>
+        `);
+    }
+
+    if (reserva.horario) {
+        linhas.push(`
+            <div class="recibo-linha">
+                <span class="rotulo">Horário:</span>
+                <span class="valor">${escaparHTMLAdmin(reserva.horario)}h</span>
+            </div>
+        `);
+    }
+
+    const infoPessoas = calcularTotalPessoasCancelamento(reserva);
+    if (infoPessoas && infoPessoas.total > 0) {
+        linhas.push(`
+            <div class="recibo-linha">
+                <span class="rotulo">Quantidade de pessoas:</span>
+                <span class="valor">${escaparHTMLAdmin(infoPessoas.texto)}</span>
+            </div>
+        `);
+    }
+
+    listaEl.innerHTML = linhas.join('');
+
+    document.getElementById('cancel-busca-card')?.classList.add('hidden');
+    document.getElementById('cancel-sucesso-card')?.classList.add('hidden');
+    document.getElementById('cancel-resultado-card')?.classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function abrirModalConfirmacaoCancelamento() {
+    if (!reservaSelecionadaParaCancelar) {
+        voltarParaBuscaCancelamento();
+        return;
+    }
+
+    const modal = document.getElementById('cancel-confirm-modal');
+    const resumo = document.getElementById('cancel-confirm-resumo');
+    const erroEl = document.getElementById('cancel-confirm-error');
+    const btnConfirmar = document.getElementById('btn-confirmar-cancelamento-final');
+
+    if (erroEl) erroEl.textContent = '';
+    if (btnConfirmar) {
+        btnConfirmar.disabled = false;
+        btnConfirmar.innerHTML = '<i class="fa-solid fa-calendar-xmark"></i> Sim, cancelar reserva';
+    }
+
+    if (resumo) {
+        const r = reservaSelecionadaParaCancelar;
+        const partesInfo = [];
+        if (r.data) partesInfo.push(`<strong>Data:</strong> ${escaparHTMLAdmin(formatarDataBR(r.data))}`);
+        if (r.horario) partesInfo.push(`<strong>Horário:</strong> ${escaparHTMLAdmin(r.horario)}h`);
+        resumo.innerHTML = `
+            <div><strong>Cliente:</strong> ${escaparHTMLAdmin(r.nome || '-')}</div>
+            <div><strong>Mesa:</strong> Mesa ${escaparHTMLAdmin(r.mesa ?? '-')}</div>
+            ${partesInfo.length ? `<div>${partesInfo.join(' &bull; ')}</div>` : ''}
+        `;
+    }
+
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+    }
+}
+
+function fecharModalConfirmacaoCancelamento() {
+    const modal = document.getElementById('cancel-confirm-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('modal-open');
+}
+
+async function confirmarCancelamentoCliente() {
+    if (!reservaSelecionadaParaCancelar) {
+        fecharModalConfirmacaoCancelamento();
+        return;
+    }
+
+    const btn = document.getElementById('btn-confirmar-cancelamento-final');
+    const erroEl = document.getElementById('cancel-confirm-error');
+    const targetKey = String(reservaSelecionadaParaCancelar._firebaseKey || reservaSelecionadaParaCancelar.id || '').trim();
+
+    if (!targetKey) {
+        if (erroEl) erroEl.textContent = 'Não foi possível identificar o registro da reserva.';
+        return;
+    }
+
+    if (erroEl) erroEl.textContent = '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> CANCELANDO...';
+    }
+
+    try {
+        // Confirma no banco antes de atualizar para evitar cancelamentos duplicados ou incorretos
+        const snapAtual = await dbRef.child('reservas').child(targetKey).once('value');
+        const dadosAtuais = snapAtual.val();
+
+        if (!dadosAtuais) {
+            throw new Error('Esta reserva não existe mais no sistema.');
+        }
+
+        if (!ehStatusReservaAtiva(dadosAtuais.status)) {
+            throw new Error('Esta reserva já foi cancelada anteriormente.');
+        }
+
+        await dbRef.child('reservas').child(targetKey).update({
+            status: 'cancelada',
+            canceladaEm: new Date().toISOString(),
+            canceladaPor: 'cliente'
+        });
+
+        // Atualiza imediatamente o estado local enquanto o listener do Firebase sincroniza
+        estadoGlobal.reservas = estadoGlobal.reservas.map((r) => {
+            const key = String(r._firebaseKey || r.id || '');
+            if (key === targetKey) {
+                return { ...r, status: 'cancelada' };
+            }
+            return r;
+        });
+
+        reservaSelecionadaParaCancelar = null;
+        fecharModalConfirmacaoCancelamento();
+
+        atualizarSelectMesas();
+        renderCalendarioCliente();
+        atualizarAdminSeAberto();
+
+        document.getElementById('cancel-busca-card')?.classList.add('hidden');
+        document.getElementById('cancel-resultado-card')?.classList.add('hidden');
+        document.getElementById('cancel-sucesso-card')?.classList.remove('hidden');
+
+        mostrarPopupNotificacao('Reserva cancelada com sucesso!', 'fa-circle-check');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+        if (erroEl) {
+            erroEl.textContent = error.message || 'Erro ao cancelar reserva. Tente novamente.';
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-calendar-xmark"></i> Sim, cancelar reserva';
+        }
+    }
+}
+
