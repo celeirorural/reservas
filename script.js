@@ -107,7 +107,11 @@
            inicializarCustomSelect('cli-horario');
            inicializarCustomSelect('cli-mesa');
            document.getElementById('cli-horario')?.addEventListener('change', () => {
+               ocultarAlertaConflitoMesa();
                atualizarSelectMesas();
+           });
+           document.getElementById('cli-mesa')?.addEventListener('change', () => {
+               ocultarAlertaConflitoMesa();
            });
        });
 
@@ -213,6 +217,7 @@
        
        let estadoGlobal = {
            reservas: [],
+           ocupacaoMesas: {},
            configCasa: { totalMesas: 100, capacidadePessoas: 400, reservasTrancadas: false },
            bloqueio: {
                trancado: false,
@@ -221,18 +226,14 @@
            }
        };
        let dadosReservaAtual = null;
+       let reservaEmProcessamento = false;
 
-       firebase.database().ref('.info/connected').on('value', (snap) => {
-           const container = document.getElementById('conexao-status-container');
-           if (snap.val() === true) {
-               container.innerHTML = `<span class="status-conexao-badge sc-online"><i class="fa-solid fa-circle"></i> Online</span>`;
-           } else {
-               container.innerHTML = `<span class="status-conexao-badge sc-offline"><i class="fa-solid fa-wifi"></i> Offline</span>`;
-           }
-       });
+       function ehStatusAtivoReserva(status) {
+           const s = String(status || 'reservada').toLowerCase();
+           return !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(s);
+       }
 
-       dbRef.on('value', (snapshot) => {
-           const dados = snapshot.val();
+       function aplicarDadosSnapshotGlobal(dados) {
            if (dados) {
                estadoGlobal.reservas = dados.reservas
                    ? Object.entries(dados.reservas).map(([firebaseKey, item]) => ({
@@ -241,6 +242,9 @@
                        _firebaseKey: firebaseKey
                    }))
                    : [];
+               estadoGlobal.ocupacaoMesas = (dados.ocupacao_mesas && typeof dados.ocupacao_mesas === 'object')
+                   ? dados.ocupacao_mesas
+                   : {};
                if (dados.configCasa) estadoGlobal.configCasa = dados.configCasa;
 
                const trancadoGlobal = Boolean(
@@ -255,8 +259,109 @@
                };
            } else {
                estadoGlobal.reservas = [];
+               estadoGlobal.ocupacaoMesas = {};
                estadoGlobal.bloqueio = { trancado: false, datasTrancadas: {} };
            }
+       }
+
+       function obterMesasOcupadasNaData(dataISO, ignorarReservaId = null) {
+           const ocupadas = new Set();
+           if (!dataISO) return ocupadas;
+
+           const reservas = Array.isArray(estadoGlobal?.reservas) ? estadoGlobal.reservas : [];
+           reservas.forEach(r => {
+               if (!r || r.data !== dataISO) return;
+               if (ignorarReservaId && String(r.id) === String(ignorarReservaId)) return;
+               if (!ehStatusAtivoReserva(r.status)) return;
+               const m = parseInt(r.mesa, 10);
+               if (!isNaN(m)) ocupadas.add(m);
+           });
+
+           const locksData = estadoGlobal?.ocupacaoMesas?.[dataISO];
+           if (locksData && typeof locksData === 'object') {
+               Object.entries(locksData).forEach(([mesaKey, lock]) => {
+                   if (!lock || !lock.reservaId) return;
+                   if (ignorarReservaId && String(lock.reservaId) === String(ignorarReservaId)) return;
+                   if (!ehStatusAtivoReserva(lock.status)) return;
+                   const m = parseInt(lock.mesa ?? mesaKey, 10);
+                   if (!isNaN(m)) ocupadas.add(m);
+               });
+           }
+
+           return ocupadas;
+       }
+
+       async function ocuparLockMesaAtomico(dataISO, mesaNum, dadosLock) {
+           const lockRef = dbRef.child('ocupacao_mesas').child(String(dataISO)).child(String(parseInt(mesaNum, 10)));
+           const txResult = await lockRef.transaction((currentLock) => {
+               if (
+                   currentLock &&
+                   currentLock.reservaId &&
+                   String(currentLock.reservaId) !== String(dadosLock.reservaId) &&
+                   ehStatusAtivoReserva(currentLock.status)
+               ) {
+                   // Aborta atomicamente: outro cliente acabou de reservar esta mesa nesta data
+                   return;
+               }
+               return {
+                   reservaId: String(dadosLock.reservaId),
+                   data: String(dataISO),
+                   horario: String(dadosLock.horario || ''),
+                   mesa: parseInt(mesaNum, 10),
+                   nome: String(dadosLock.nome || ''),
+                   status: String(dadosLock.status || 'reservada'),
+                   atualizadoEm: new Date().toISOString()
+               };
+           });
+           return txResult;
+       }
+
+       async function liberarLockMesa(dataISO, mesaNum, reservaId = null) {
+           if (!dataISO || !mesaNum) return;
+           const mesaKey = String(parseInt(mesaNum, 10));
+           const lockRef = dbRef.child('ocupacao_mesas').child(String(dataISO)).child(mesaKey);
+           try {
+               await lockRef.transaction((curr) => {
+                   if (!curr) return curr;
+                   if (!reservaId || !curr.reservaId || String(curr.reservaId) === String(reservaId)) {
+                       return null;
+                   }
+                   return curr;
+               });
+           } catch (err) {
+               console.warn('Aviso ao liberar lock de mesa:', err);
+           }
+       }
+
+       function mostrarAlertaConflitoMesa(mensagem = 'Ops! Essa mesa acabou de ser reservada por outra pessoa. Escolha outra mesa para continuar.') {
+           const box = document.getElementById('alerta-conflito-mesa');
+           const txt = document.getElementById('alerta-conflito-mesa-texto');
+           if (txt) txt.textContent = mensagem;
+           if (box) {
+               box.classList.remove('hidden');
+               box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           } else {
+               alert(mensagem);
+           }
+           mostrarPopupNotificacao('Mesa indisponível. Escolha outra mesa!', 'fa-circle-exclamation');
+       }
+
+       function ocultarAlertaConflitoMesa() {
+           const box = document.getElementById('alerta-conflito-mesa');
+           if (box) box.classList.add('hidden');
+       }
+
+       firebase.database().ref('.info/connected').on('value', (snap) => {
+           const container = document.getElementById('conexao-status-container');
+           if (snap.val() === true) {
+               container.innerHTML = `<span class="status-conexao-badge sc-online"><i class="fa-solid fa-circle"></i> Online</span>`;
+           } else {
+               container.innerHTML = `<span class="status-conexao-badge sc-offline"><i class="fa-solid fa-wifi"></i> Offline</span>`;
+           }
+       });
+
+       dbRef.on('value', (snapshot) => {
+           aplicarDadosSnapshotGlobal(snapshot.val());
            atualizarInterfaceBloqueioCliente();
            atualizarSelectMesas();
            renderCalendarioCliente();
@@ -343,13 +448,7 @@
            if (!dataISO) return [];
            if (verificarSeReservasTrancadas(dataISO)) return [];
            const totalMesas = estadoGlobal.configCasa?.totalMesas || 100;
-           const reservasDaData = (Array.isArray(estadoGlobal?.reservas) ? estadoGlobal.reservas : []).filter(r => {
-               if (r.data !== dataISO) return false;
-               const status = String(r.status || 'reservada').toLowerCase();
-               return !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(status);
-           });
-
-           const mesasOcupadas = new Set(reservasDaData.map(r => parseInt(r.mesa)).filter(n => !isNaN(n)));
+           const mesasOcupadas = obterMesasOcupadasNaData(dataISO);
            const mesasLivres = [];
 
            for (let i = 1; i <= totalMesas; i++) {
@@ -494,6 +593,7 @@ function irParaMesAtualCliente(){
 
 function selecionarDataCliente(iso){
     if(!ehDataPermitidaCliente(iso)) return;
+    ocultarAlertaConflitoMesa();
     clienteDataSelecionada=iso;
     const campo=document.getElementById('cli-data');
     if(campo) campo.value=iso;
@@ -622,13 +722,26 @@ function inicializarCustomSelect(selectId){
 
 document.addEventListener('click',()=>fecharTodosCustomSelects());
 
-              // ENVIO DO FORMULÁRIO DE AUTORRESERVA
-       document.getElementById('form-autorreserva').onsubmit = function(e) {
+              // ENVIO DO FORMULÁRIO DE AUTORRESERVA COM PROTEÇÃO CONTRA CONCORRÊNCIA
+       document.getElementById('form-autorreserva').onsubmit = async function(e) {
            e.preventDefault();
 
+           if (reservaEmProcessamento) return;
+
            const btnSubmit = document.getElementById('btn-submit');
-           btnSubmit.disabled = true;
-           btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> PROCESSANDO...`;
+           const restaurarBotaoPadrao = () => {
+               if (btnSubmit) {
+                   btnSubmit.disabled = false;
+                   btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
+               }
+           };
+
+           ocultarAlertaConflitoMesa();
+           reservaEmProcessamento = true;
+           if (btnSubmit) {
+               btnSubmit.disabled = true;
+               btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> VERIFICANDO DISPONIBILIDADE...`;
+           }
 
            const nome = document.getElementById('cli-nome').value.trim();
            const adultos = parseInt(document.getElementById('cli-adultos').value) || 0;
@@ -639,105 +752,165 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
            const mesaNum = parseInt(document.getElementById('cli-mesa').value);
            const obs = document.getElementById('cli-obs').value.trim();
 
-           // VERIFICAÇÃO SE AS RESERVAS ESTÃO TRANCADAS
-           if (verificarSeReservasTrancadas(dataReserva)) {
-               alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
-               atualizarInterfaceBloqueioCliente();
-               btnSubmit.disabled = true;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
-               return;
-           }
-
            const totalNovasPessoas = adultos + kids05 + kids610;
+           let idReserva = null;
+           let lockAdquirido = false;
 
-           if (totalNovasPessoas <= 0) {
-               alert("Por favor, adicione pelo menos 1 integrante para a reserva.");
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+           try {
+               if (!nome) {
+                   alert("Por favor, informe o nome completo do responsável.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           if (totalNovasPessoas > 30) {
-               alert("Para reservas acima de 30 pessoas, por favor utilize a solicitação via WhatsApp.");
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+               if (!dataReserva) {
+                   alert("Por favor, selecione uma data válida.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           if (!mesaNum) {
-               alert("Por favor, selecione o N° da sua mesa.");
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+               if (totalNovasPessoas <= 0) {
+                   alert("Por favor, adicione pelo menos 1 integrante para a reserva.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           // VERIFICAÇÃO SE A MESA ESTÁ ENTRE AS PRÓXIMAS LIVRES NA SEQUÊNCIA
-           const proximasPermitidas = obterProximasMesasLivres(dataReserva, LIMITE_MESAS_SEQUENCIA);
-           if (!proximasPermitidas.includes(mesaNum)) {
-               alert("A mesa selecionada não está disponível na sequência permitida. Por favor, escolha uma das próximas mesas disponíveis.");
-               atualizarSelectMesas();
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+               if (totalNovasPessoas > 30) {
+                   alert("Para reservas acima de 30 pessoas, por favor utilize a solicitação via WhatsApp.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           // VERIFICAÇÃO DE MESA OCUPADA NA MESMA DATA
-           const mesaOcupada = estadoGlobal.reservas.find(r => r.data === dataReserva && parseInt(r.mesa) === mesaNum && !['cancelada', 'cancelado', 'encerrada', 'encerrado', 'excluida', 'excluído'].includes(String(r.status || '').toLowerCase()));
-           if (mesaOcupada) {
-               alert(`A Mesa ${mesaNum} acabou de ser reservada para este dia por outro cliente. Por favor, escolha outra mesa.`);
-               atualizarSelectMesas();
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+               if (!mesaNum || isNaN(mesaNum)) {
+                   alert("Por favor, selecione o N° da sua mesa.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           // VERIFICAÇÃO DE CAPACIDADE MÁXIMA DO DIA
-           const capacidadePessoas = estadoGlobal.configCasa.capacidadePessoas || 400;
-           const pessoasNaData = getPessoasNaData(dataReserva);
-           const assentosDisponiveis = capacidadePessoas - pessoasNaData;
+               // 1. CONSULTA EM TEMPO REAL DIRETAMENTE NO FIREBASE ANTES DE CONFIRMAR
+               const snapAtualizado = await dbRef.once('value');
+               aplicarDadosSnapshotGlobal(snapAtualizado.val());
 
-           if (totalNovasPessoas > assentosDisponiveis) {
-               alert(`Infelizmente a casa atingiu o limite de capacidade para este dia. Vagas restantes: ${assentosDisponiveis}.`);
-               btnSubmit.disabled = false;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
-               return;
-           }
+               // VERIFICAÇÃO DE BLOQUEIO GERAL/DATA COM DADOS ATUALIZADOS DO BANCO
+               if (verificarSeReservasTrancadas(dataReserva)) {
+                   alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
+                   atualizarInterfaceBloqueioCliente();
+                   if (btnSubmit) {
+                       btnSubmit.disabled = true;
+                       btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
+                   }
+                   return;
+               }
 
-           const idReserva = Date.now().toString();
-           const novaReserva = {
-               id: idReserva,
-               nome: nome,
-               adultos: adultos,
-               kids05: kids05,
-               kids610: kids610,
-               data: dataReserva,
-               horario: horario,
-               mesa: mesaNum,
-               telefone: document.getElementById('cli-telefone')?.value.trim() || '',
-               obs: obs,
-               status: 'reservada'
-           };
+               // VERIFICAÇÃO REAL DE OCUPAÇÃO DA MESA NA DATA NO BANCO DE DADOS
+               const mesasOcupadasBanco = obterMesasOcupadasNaData(dataReserva);
+               if (mesasOcupadasBanco.has(mesaNum)) {
+                   atualizarSelectMesas();
+                   renderCalendarioCliente();
+                   mostrarAlertaConflitoMesa("Ops! Essa mesa acabou de ser reservada por outra pessoa. Escolha outra mesa para continuar.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           // VERIFICAÇÃO FINAL ANTES DE GRAVAR NO BANCO DE DADOS
-           if (verificarSeReservasTrancadas(dataReserva)) {
-               alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
-               atualizarInterfaceBloqueioCliente();
-               btnSubmit.disabled = true;
-               btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
-               return;
-           }
+               // VERIFICAÇÃO SE A MESA ESTÁ ENTRE AS PRÓXIMAS LIVRES NA SEQUÊNCIA
+               const proximasPermitidas = obterProximasMesasLivres(dataReserva, LIMITE_MESAS_SEQUENCIA);
+               if (!proximasPermitidas.includes(mesaNum)) {
+                   atualizarSelectMesas();
+                   renderCalendarioCliente();
+                   mostrarAlertaConflitoMesa("Ops! Essa mesa acabou de ser reservada por outra pessoa. Escolha outra mesa para continuar.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
 
-           dbRef.child('reservas').child(idReserva).set(novaReserva)
-               .then(() => {
-                   dadosReservaAtual = novaReserva;
-                   mostrarPopupNotificacao();
-                   exibirComprovante(novaReserva);
-               })
-               .catch((error) => {
-                   alert("Erro ao gravar a reserva: " + error.message);
-                   btnSubmit.disabled = false;
-                   btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle"></i> CONFIRMAR MINHA RESERVA`;
+               // VERIFICAÇÃO DE CAPACIDADE MÁXIMA DO DIA
+               const capacidadePessoas = estadoGlobal.configCasa.capacidadePessoas || 400;
+               const pessoasNaData = getPessoasNaData(dataReserva);
+               const assentosDisponiveis = capacidadePessoas - pessoasNaData;
+
+               if (totalNovasPessoas > assentosDisponiveis) {
+                   alert(`Infelizmente a casa atingiu o limite de capacidade para este dia. Vagas restantes: ${Math.max(0, assentosDisponiveis)}.`);
+                   restaurarBotaoPadrao();
+                   return;
+               }
+
+               idReserva = `${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
+               const novaReserva = {
+                   id: idReserva,
+                   nome: nome,
+                   adultos: adultos,
+                   kids05: kids05,
+                   kids610: kids610,
+                   data: dataReserva,
+                   horario: horario,
+                   mesa: mesaNum,
+                   telefone: document.getElementById('cli-telefone')?.value.trim() || '',
+                   obs: obs,
+                   status: 'reservada',
+                   criadoEm: new Date().toISOString()
+               };
+
+               if (btnSubmit) {
+                   btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> CONFIRMANDO MESA...`;
+               }
+
+               // 2. TRANSAÇÃO ATÔMICA NO FIREBASE PARA IMPEDIR RESERVA SIMULTÂNEA (RACE CONDITION)
+               const txResult = await ocuparLockMesaAtomico(dataReserva, mesaNum, {
+                   reservaId: idReserva,
+                   horario: horario,
+                   nome: nome,
+                   status: 'reservada'
                });
+
+               if (!txResult.committed || String(txResult.snapshot?.val()?.reservaId || '') !== String(idReserva)) {
+                   // Outro cliente venceu a transação simultânea para a mesma mesa
+                   const snapPosConflito = await dbRef.once('value');
+                   aplicarDadosSnapshotGlobal(snapPosConflito.val());
+                   atualizarSelectMesas();
+                   renderCalendarioCliente();
+                   mostrarAlertaConflitoMesa("Ops! Essa mesa acabou de ser reservada por outra pessoa. Escolha outra mesa para continuar.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
+
+               lockAdquirido = true;
+
+               // 3. DUPLA CHECAGEM EM `reservas` CONTRA REGISTROS LEGADOS SEM LOCK PRÉVIO
+               const snapReservasCheck = await dbRef.child('reservas').once('value');
+               const reservasCheckObj = snapReservasCheck.val() || {};
+               const conflitoLegado = Object.values(reservasCheckObj).find((r) => {
+                   if (!r || r.data !== dataReserva) return false;
+                   if (String(r.id) === String(idReserva)) return false;
+                   if (!ehStatusAtivoReserva(r.status)) return false;
+                   return parseInt(r.mesa, 10) === mesaNum;
+               });
+
+               if (conflitoLegado) {
+                   await liberarLockMesa(dataReserva, mesaNum, idReserva);
+                   lockAdquirido = false;
+                   const snapRefresh = await dbRef.once('value');
+                   aplicarDadosSnapshotGlobal(snapRefresh.val());
+                   atualizarSelectMesas();
+                   renderCalendarioCliente();
+                   mostrarAlertaConflitoMesa("Ops! Essa mesa acabou de ser reservada por outra pessoa. Escolha outra mesa para continuar.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
+
+               // 4. GRAVAÇÃO DEFINITIVA DA RESERVA APÓS LOCK ATÔMICO GARANTIDO
+               await dbRef.child('reservas').child(idReserva).set(novaReserva);
+
+               dadosReservaAtual = novaReserva;
+               mostrarPopupNotificacao();
+               exibirComprovante(novaReserva);
+           } catch (error) {
+               if (lockAdquirido && idReserva) {
+                   await liberarLockMesa(dataReserva, mesaNum, idReserva);
+               }
+               alert("Erro ao gravar a reserva: " + (error?.message || error));
+               restaurarBotaoPadrao();
+           } finally {
+               reservaEmProcessamento = false;
+           }
        };
 
        function exibirComprovante(reserva) {
@@ -772,6 +945,7 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
        }
 
        function reiniciarFormulario() {
+           ocultarAlertaConflitoMesa();
            document.getElementById('form-autorreserva').reset();
            validarCapacidadeGrupo();
            sincronizarCustomSelect('cli-horario');
@@ -1499,8 +1673,8 @@ function preencherMesasEdicaoAdmin(dataISO, mesaAtual) {
     if (!select) return;
 
     const totalMesas = Number(estadoGlobal.configCasa?.totalMesas || 100);
-    const reservas = getReservasAtivasAdmin().filter(r => r.data === dataISO && String(r.id) !== String(document.getElementById('admin-edit-id')?.value || ''));
-    const ocupadas = new Set(reservas.map(r => Number(r.mesa)));
+    const idEdicaoAtual = document.getElementById('admin-edit-id')?.value || '';
+    const ocupadas = obterMesasOcupadasNaData(dataISO, idEdicaoAtual);
 
     select.innerHTML = '';
 
@@ -1637,8 +1811,42 @@ async function salvarEdicaoReservaAdmin() {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SALVANDO...';
 
+    const targetKey = String(reservaOriginal._firebaseKey || reservaOriginal.id || id);
+    const mudouMesaOuData = (reservaOriginal.data !== data || Number(reservaOriginal.mesa) !== mesa);
+    let novoLockAdquirido = false;
+
     try {
-        await dbRef.child('reservas').child(id).update(dadosAtualizados);
+        const snapLive = await dbRef.once('value');
+        aplicarDadosSnapshotGlobal(snapLive.val());
+
+        const ocupadasLive = obterMesasOcupadasNaData(data, id);
+        if (ehStatusAtivoReserva(status) && ocupadasLive.has(mesa)) {
+            erro.textContent = `A Mesa ${mesa} já está reservada para ${formatarDataBR(data)}.`;
+            return;
+        }
+
+        if (ehStatusAtivoReserva(status)) {
+            const txEdit = await ocuparLockMesaAtomico(data, mesa, {
+                reservaId: id,
+                horario: horario,
+                nome: nome,
+                status: status
+            });
+            if (!txEdit.committed || String(txEdit.snapshot?.val()?.reservaId || '') !== String(id)) {
+                erro.textContent = `A Mesa ${mesa} acabou de ser reservada para ${formatarDataBR(data)}.`;
+                return;
+            }
+            novoLockAdquirido = true;
+        }
+
+        await dbRef.child('reservas').child(targetKey).update(dadosAtualizados);
+
+        if (!ehStatusAtivoReserva(status)) {
+            await liberarLockMesa(reservaOriginal.data, reservaOriginal.mesa, id);
+        } else if (mudouMesaOuData) {
+            await liberarLockMesa(reservaOriginal.data, reservaOriginal.mesa, id);
+        }
+
         fecharEdicaoReservaAdmin();
 
         // Mantém a data selecionada no calendário após a edição.
@@ -1647,7 +1855,12 @@ async function salvarEdicaoReservaAdmin() {
         adminMesAtual = new Date(adminMesAtual.getFullYear(), adminMesAtual.getMonth(), 1);
         renderAdminCalendario();
         renderAdminReservas();
+        atualizarSelectMesas();
+        renderCalendarioCliente();
     } catch (error) {
+        if (novoLockAdquirido && mudouMesaOuData) {
+            await liberarLockMesa(data, mesa, id);
+        }
         erro.textContent = 'Não foi possível salvar: ' + error.message;
     } finally {
         btn.disabled = false;
@@ -1727,7 +1940,13 @@ async function confirmarExclusaoReservaAdmin() {
     }
 
     try {
-        await dbRef.child('reservas').child(id).remove();
+        const reservaAlvo = estadoGlobal.reservas.find(r => String(r.id) === String(id));
+        const targetKey = String(reservaAlvo?._firebaseKey || id);
+        await dbRef.child('reservas').child(targetKey).remove();
+
+        if (reservaAlvo) {
+            await liberarLockMesa(reservaAlvo.data, reservaAlvo.mesa, reservaAlvo.id || targetKey);
+        }
         
         // Remove também da lista local para resposta imediata
         estadoGlobal.reservas = estadoGlobal.reservas.filter(r => String(r.id) !== String(id));
@@ -2144,6 +2363,8 @@ async function confirmarCancelamentoCliente() {
             canceladaPor: 'cliente'
         });
 
+        await liberarLockMesa(dadosAtuais.data, dadosAtuais.mesa, dadosAtuais.id || targetKey);
+
         // Atualiza imediatamente o estado local enquanto o listener do Firebase sincroniza
         estadoGlobal.reservas = estadoGlobal.reservas.map((r) => {
             const key = String(r._firebaseKey || r.id || '');
@@ -2152,6 +2373,13 @@ async function confirmarCancelamentoCliente() {
             }
             return r;
         });
+        if (dadosAtuais.data && dadosAtuais.mesa && estadoGlobal.ocupacaoMesas?.[dadosAtuais.data]) {
+            const mKey = String(parseInt(dadosAtuais.mesa, 10));
+            const lockAtual = estadoGlobal.ocupacaoMesas[dadosAtuais.data][mKey];
+            if (!lockAtual || String(lockAtual.reservaId || '') === String(dadosAtuais.id || targetKey)) {
+                delete estadoGlobal.ocupacaoMesas[dadosAtuais.data][mKey];
+            }
+        }
 
         reservaSelecionadaParaCancelar = null;
         fecharModalConfirmacaoCancelamento();

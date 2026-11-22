@@ -2102,4 +2102,35 @@ body.modal-open{overflow:hidden;}
     }
 }
 
+/* Banner visual de conflito / mesa reservada simultaneamente */
+.banner-conflito-mesa {
+    background: linear-gradient(135deg, rgba(211, 74, 38, 0.16) 0%, rgba(26, 26, 23, 0.96) 100%);
+    border: 1px solid rgba(224, 130, 63, 0.55);
+    border-left: 4px solid #e65630;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    color: var(--texto-branco);
+    box-shadow: 0 8px 24px rgba(211, 74, 38, 0.18);
+    animation: fadeIn 0.25s ease-out;
+}
+
+.banner-conflito-mesa i {
+    color: #ff7b54;
+    font-size: 1.2rem;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.banner-conflito-mesa p {
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.45;
+    margin: 0;
+}
+
+
 
