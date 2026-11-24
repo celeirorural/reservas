@@ -10,39 +10,33 @@ const ANO_MINIMO_CALENDARIO = 2026;
 const ANO_MAXIMO_CALENDARIO = 2027;
 const HORARIOS_PERMITIDOS = new Set(['11:30', '11:45', '12:00']);
 
-// Feriados Nacionais, Estadual (SP - 09/07) e Municipais de Bauru/SP (Corpus Christi e 01/08) + Carnaval
-export const FERIADOS_PERMITIDOS = new Set([
+// Feriados Nacionais Oficiais do Brasil (2026 e 2027) — sem pontos facultativos (Carnaval / Corpus Christi)
+export const FERIADOS_NACIONAIS_NOMES = {
   // 2026
-  '2026-01-01', // Confraternização Universal
-  '2026-02-17', // Carnaval
-  '2026-04-03', // Paixão de Cristo (Sexta-feira Santa)
-  '2026-04-21', // Tiradentes
-  '2026-05-01', // Dia do Trabalho
-  '2026-06-04', // Corpus Christi (Feriado Municipal - Bauru/SP)
-  '2026-07-09', // Revolução Constitucionalista de 1932 (Feriado Estadual - SP)
-  '2026-08-01', // Aniversário de Bauru (Feriado Municipal - Bauru/SP)
-  '2026-09-07', // Independência do Brasil
-  '2026-10-12', // Nossa Senhora Aparecida
-  '2026-11-02', // Finados
-  '2026-11-15', // Proclamação da República
-  '2026-11-20', // Dia Nacional de Zumbi e da Consciência Negra
-  '2026-12-25', // Natal
+  '2026-01-01': 'Confraternização Universal',
+  '2026-04-03': 'Paixão de Cristo (Sexta-feira Santa)',
+  '2026-04-21': 'Tiradentes',
+  '2026-05-01': 'Dia do Trabalho',
+  '2026-09-07': 'Independência do Brasil',
+  '2026-10-12': 'Nossa Senhora Aparecida',
+  '2026-11-02': 'Finados',
+  '2026-11-15': 'Proclamação da República',
+  '2026-11-20': 'Dia Nacional de Zumbi e da Consciência Negra',
+  '2026-12-25': 'Natal',
   // 2027
-  '2027-01-01', // Confraternização Universal
-  '2027-02-09', // Carnaval
-  '2027-03-26', // Paixão de Cristo (Sexta-feira Santa)
-  '2027-04-21', // Tiradentes
-  '2027-05-01', // Dia do Trabalho
-  '2027-05-27', // Corpus Christi (Feriado Municipal - Bauru/SP)
-  '2027-07-09', // Revolução Constitucionalista de 1932 (Feriado Estadual - SP)
-  '2027-08-01', // Aniversário de Bauru (Feriado Municipal - Bauru/SP)
-  '2027-09-07', // Independência do Brasil
-  '2027-10-12', // Nossa Senhora Aparecida
-  '2027-11-02', // Finados
-  '2027-11-15', // Proclamação da República
-  '2027-11-20', // Dia Nacional de Zumbi e da Consciência Negra
-  '2027-12-25', // Natal
-]);
+  '2027-01-01': 'Confraternização Universal',
+  '2027-03-26': 'Paixão de Cristo (Sexta-feira Santa)',
+  '2027-04-21': 'Tiradentes',
+  '2027-05-01': 'Dia do Trabalho',
+  '2027-09-07': 'Independência do Brasil',
+  '2027-10-12': 'Nossa Senhora Aparecida',
+  '2027-11-02': 'Finados',
+  '2027-11-15': 'Proclamação da República',
+  '2027-11-20': 'Dia Nacional de Zumbi e da Consciência Negra',
+  '2027-12-25': 'Natal',
+};
+
+export const FERIADOS_PERMITIDOS = new Set(Object.keys(FERIADOS_NACIONAIS_NOMES));
 
 export function obterHojeSaoPauloISO(agora = new Date()) {
   try {
@@ -83,7 +77,14 @@ export function ehDomingoISO(iso) {
 }
 
 export function ehFeriadoISO(iso) {
-  return FERIADOS_PERMITIDOS.has(String(iso || '').trim());
+  return Object.prototype.hasOwnProperty.call(
+    FERIADOS_NACIONAIS_NOMES,
+    String(iso || '').trim()
+  );
+}
+
+export function obterNomeFeriadoISO(iso) {
+  return FERIADOS_NACIONAIS_NOMES[String(iso || '').trim()] || '';
 }
 
 function mapaContemData(mapa, iso) {
@@ -123,6 +124,7 @@ export function avaliarDisponibilidadeData(
   const bloqueadaManual =
     mapaContemData(bloqueioObj?.datasTrancadas, dataISO) ||
     mapaContemData(configObj?.datasTrancadas, dataISO);
+  const feriadoNome = obterNomeFeriadoISO(dataISO);
 
   // Prioridade 1: Data bloqueada manualmente NÃO permite reservas.
   if (bloqueadaManual) {
@@ -131,6 +133,7 @@ export function avaliarDisponibilidadeData(
       disponivel: false,
       prioridade: 1,
       motivo: 'bloqueada_manual',
+      feriadoNome: feriadoNome || null,
       mensagem: 'Esta data está bloqueada para novas reservas no momento. Escolha outra data disponível.',
     };
   }
@@ -146,6 +149,7 @@ export function avaliarDisponibilidadeData(
       disponivel: true,
       prioridade: 2,
       motivo: 'liberada_manual',
+      feriadoNome: feriadoNome || null,
       mensagem: 'Data liberada excepcionalmente pela administração.',
     };
   }
@@ -153,15 +157,16 @@ export function avaliarDisponibilidadeData(
   const domingo = ehDomingoISO(dataISO);
   const feriado = ehFeriadoISO(dataISO);
 
-  // Prioridade 3: Domingo ou feriado permite reservas.
+  // Prioridade 3: Domingo ou feriado nacional permite reservas.
   if (domingo || feriado) {
     return {
       data: dataISO,
       disponivel: true,
       prioridade: 3,
       motivo: feriado ? 'feriado' : 'domingo',
+      feriadoNome: feriadoNome || null,
       mensagem: feriado
-        ? 'Feriado com funcionamento normal para reservas.'
+        ? `Feriado nacional (${feriadoNome}) com funcionamento normal para reservas.`
         : 'Domingo com funcionamento normal para reservas.',
     };
   }
@@ -172,7 +177,8 @@ export function avaliarDisponibilidadeData(
     disponivel: false,
     prioridade: 4,
     motivo: 'dia_comum_indisponivel',
-    mensagem: 'Reservas são permitidas somente aos domingos, feriados ou em datas liberadas pela administração.',
+    feriadoNome: null,
+    mensagem: 'Reservas são permitidas somente aos domingos, feriados nacionais ou em datas liberadas pela administração.',
   };
 }
 
@@ -202,6 +208,15 @@ export function createApp({ fetchDbSnapshot = () => fetchFirebaseJson('') } = {}
   const app = express();
   app.use(express.json());
   app.use(express.static(__dirname));
+
+  app.get('/api/feriados', (_req, res) => {
+    const feriados = Object.entries(FERIADOS_NACIONAIS_NOMES).map(([data, nome]) => ({
+      data,
+      nome,
+      ano: Number(data.slice(0, 4)),
+    }));
+    return res.status(200).json({ feriados });
+  });
 
   app.get('/api/disponibilidade/:data', async (req, res) => {
     try {

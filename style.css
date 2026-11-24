@@ -560,7 +560,9 @@
 
 .admin-day {
     position: relative;
+    min-width: 0;
     min-height: 58px;
+    padding: 4px 3px;
     border: 1px solid rgba(255,255,255,0.045);
     border-radius: 9px;
     background: rgba(0,0,0,0.20);
@@ -569,7 +571,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     cursor: default;
     transition: var(--transicao);
 }
@@ -611,6 +613,18 @@
     text-transform: uppercase;
     font-weight: 800;
     letter-spacing: 0.4px;
+}
+
+.admin-day-holiday-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.43rem;
+    font-weight: 600;
+    color: #f6b69f;
+    line-height: 1.05;
+    letter-spacing: 0.1px;
 }
 
 .admin-day-reservas {

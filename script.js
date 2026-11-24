@@ -1,36 +1,29 @@
-// FERIADOS NACIONAIS, ESTADUAL (SP - 09/07) E MUNICIPAIS DE BAURU/SP (CORPUS CHRISTI E 01/08) + CARNAVAL PARA 2026 E 2027
-       const feriadosPermitidos = [
+// FERIADOS NACIONAIS OFICIAIS DO BRASIL PARA 2026 E 2027 (SEM PONTOS FACULTATIVOS COMO CARNAVAL E CORPUS CHRISTI)
+       const FERIADOS_NACIONAIS_NOMES = {
            // 2026
-           "2026-01-01", // Confraternização Universal
-           "2026-02-17", // Carnaval
-           "2026-04-03", // Paixão de Cristo (Sexta-feira Santa)
-           "2026-04-21", // Tiradentes
-           "2026-05-01", // Dia do Trabalho
-           "2026-06-04", // Corpus Christi (Municipal Bauru/SP)
-           "2026-07-09", // Revolução Constitucionalista (Estadual SP)
-           "2026-08-01", // Aniversário de Bauru (Municipal Bauru/SP)
-           "2026-09-07", // Independência do Brasil
-           "2026-10-12", // Nossa Senhora Aparecida
-           "2026-11-02", // Finados
-           "2026-11-15", // Proclamação da República
-           "2026-11-20", // Consciência Negra
-           "2026-12-25", // Natal
+           "2026-01-01": "Confraternização Universal",
+           "2026-04-03": "Paixão de Cristo (Sexta-feira Santa)",
+           "2026-04-21": "Tiradentes",
+           "2026-05-01": "Dia do Trabalho",
+           "2026-09-07": "Independência do Brasil",
+           "2026-10-12": "Nossa Senhora Aparecida",
+           "2026-11-02": "Finados",
+           "2026-11-15": "Proclamação da República",
+           "2026-11-20": "Dia Nacional de Zumbi e da Consciência Negra",
+           "2026-12-25": "Natal",
            // 2027
-           "2027-01-01", // Confraternização Universal
-           "2027-02-09", // Carnaval
-           "2027-03-26", // Paixão de Cristo (Sexta-feira Santa)
-           "2027-04-21", // Tiradentes
-           "2027-05-01", // Dia do Trabalho
-           "2027-05-27", // Corpus Christi (Municipal Bauru/SP)
-           "2027-07-09", // Revolução Constitucionalista (Estadual SP)
-           "2027-08-01", // Aniversário de Bauru (Municipal Bauru/SP)
-           "2027-09-07", // Independência do Brasil
-           "2027-10-12", // Nossa Senhora Aparecida
-           "2027-11-02", // Finados
-           "2027-11-15", // Proclamação da República
-           "2027-11-20", // Consciência Negra
-           "2027-12-25"  // Natal
-       ];
+           "2027-01-01": "Confraternização Universal",
+           "2027-03-26": "Paixão de Cristo (Sexta-feira Santa)",
+           "2027-04-21": "Tiradentes",
+           "2027-05-01": "Dia do Trabalho",
+           "2027-09-07": "Independência do Brasil",
+           "2027-10-12": "Nossa Senhora Aparecida",
+           "2027-11-02": "Finados",
+           "2027-11-15": "Proclamação da República",
+           "2027-11-20": "Dia Nacional de Zumbi e da Consciência Negra",
+           "2027-12-25": "Natal"
+       };
+       const feriadosPermitidos = Object.keys(FERIADOS_NACIONAIS_NOMES);
 
         const ANO_MINIMO_CALENDARIO = 2026;
         const ANO_MAXIMO_CALENDARIO = 2027;
@@ -465,7 +458,11 @@
        }
 
        function ehFeriadoISO(dataISO) {
-           return feriadosPermitidos.includes(String(dataISO || '').trim());
+           return Object.prototype.hasOwnProperty.call(FERIADOS_NACIONAIS_NOMES, String(dataISO || '').trim());
+       }
+
+       function obterNomeFeriadoISO(dataISO) {
+           return FERIADOS_NACIONAIS_NOMES[String(dataISO || '').trim()] || '';
        }
 
        function ehFuncionamentoPadraoISO(dataISO) {
@@ -476,7 +473,7 @@
         * ORDEM DE PRIORIDADE RIGOROSA DE DISPONIBILIDADE:
         * 1. Data bloqueada manualmente: NÃO permite reservas.
         * 2. Data liberada manualmente: permite reservas.
-        * 3. Domingo ou feriado: permite reservas.
+        * 3. Domingo ou feriado nacional: permite reservas.
         * 4. Qualquer outro dia: NÃO permite reservas.
         */
        function avaliarDisponibilidadeData(dataISO, bloqueioObj = estadoGlobal?.bloqueio, configObj = estadoGlobal?.configCasa, ignorarPassado = false) {
@@ -487,6 +484,7 @@
                    disponivel: false,
                    prioridade: 0,
                    motivo: 'data_invalida',
+                   feriadoNome: null,
                    mensagem: 'Por favor, selecione uma data válida dentro do calendário de 2026 ou 2027.'
                };
            }
@@ -497,10 +495,12 @@
                    disponivel: false,
                    prioridade: 0,
                    motivo: 'data_passada',
+                   feriadoNome: null,
                    mensagem: 'Não é possível realizar reservas para datas que já passaram.'
                };
            }
 
+           const feriadoNome = obterNomeFeriadoISO(iso);
            const bloqueadaManual = verificarDataEspecificaTrancada(iso, bloqueioObj, configObj);
            if (bloqueadaManual) {
                return {
@@ -510,6 +510,7 @@
                    motivo: 'bloqueada_manual',
                    ehDomingo: ehDomingoISO(iso),
                    ehFeriado: ehFeriadoISO(iso),
+                   feriadoNome: feriadoNome || null,
                    bloqueadaManual: true,
                    liberadaManual: verificarDataEspecificaLiberada(iso, bloqueioObj, configObj),
                    mensagem: 'Esta data está bloqueada para novas reservas no momento. Escolha outra data disponível.'
@@ -525,6 +526,7 @@
                    motivo: 'liberada_manual',
                    ehDomingo: ehDomingoISO(iso),
                    ehFeriado: ehFeriadoISO(iso),
+                   feriadoNome: feriadoNome || null,
                    bloqueadaManual: false,
                    liberadaManual: true,
                    mensagem: 'Data liberada manualmente pela administração.'
@@ -541,9 +543,12 @@
                    motivo: feriado ? 'feriado' : 'domingo',
                    ehDomingo: domingo,
                    ehFeriado: feriado,
+                   feriadoNome: feriadoNome || null,
                    bloqueadaManual: false,
                    liberadaManual: false,
-                   mensagem: feriado ? 'Feriado com funcionamento normal para reservas.' : 'Domingo com funcionamento normal para reservas.'
+                   mensagem: feriado
+                       ? `Feriado nacional (${feriadoNome}) com funcionamento normal para reservas.`
+                       : 'Domingo com funcionamento normal para reservas.'
                };
            }
 
@@ -554,9 +559,10 @@
                motivo: 'dia_comum_indisponivel',
                ehDomingo: false,
                ehFeriado: false,
+               feriadoNome: null,
                bloqueadaManual: false,
                liberadaManual: false,
-               mensagem: 'Reservas são permitidas somente aos domingos, feriados ou em datas liberadas pela administração.'
+               mensagem: 'Reservas são permitidas somente aos domingos, feriados nacionais ou em datas liberadas pela administração.'
            };
        }
 
@@ -886,6 +892,7 @@ function renderCalendarioCliente(){
         const disp=avaliarDisponibilidadeData(iso);
         const passada=d<inicioHoje;
         const feriado=ehFeriadoISO(iso);
+        const nomeFeriado=disp.feriadoNome || obterNomeFeriadoISO(iso);
         const trancado=!passada && disp.prioridade===1;
         const liberadoExtra=!passada && disp.prioridade===2;
         const clicavel=disp.disponivel;
@@ -907,9 +914,10 @@ function renderCalendarioCliente(){
                 :(feriado?'<span class="client-day-label">FERIADO</span>':''));
         const badge=reservas.length?`<span class="client-day-reservas">${reservas.length}</span>`:'';
         const ariaLabel=clicavel
-            ?`Selecionar ${formatarDataBR(iso)}${liberadoExtra?' (Liberado extra)':(feriado?' (Feriado)':'')}`
-            :(trancado?'Data bloqueada para reservas':'Data indisponível');
-        html+=`<button type="button" class="${classes}" ${clicavel?`onclick="selecionarDataCliente('${iso}')"`:'disabled'} aria-label="${ariaLabel}"><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
+            ?`Selecionar ${formatarDataBR(iso)}${liberadoExtra?' (Liberado extra)':(feriado?` (Feriado nacional: ${nomeFeriado})`:'')}`
+            :(trancado?`Data bloqueada para reservas${nomeFeriado?` (${nomeFeriado})`:''}`:'Data indisponível');
+        const titleAttr=nomeFeriado?` title="Feriado Nacional: ${escaparHTMLAdmin(nomeFeriado)}"`:'';
+        html+=`<button type="button" class="${classes}" ${clicavel?`onclick="selecionarDataCliente('${iso}')"`:'disabled'} aria-label="${escaparHTMLAdmin(ariaLabel)}"${titleAttr}><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
     }
     grid.innerHTML=html;
 }
@@ -1760,6 +1768,7 @@ function atualizarStatusBloqueioAdmin() {
     const estaLiberadaManual = Boolean(disp && disp.prioridade === 2);
     const ehPadraoAberto = Boolean(disp && disp.prioridade === 3);
     const ehDiaComumFechado = Boolean(disp && disp.prioridade === 4);
+    const nomeFeriado = disp?.feriadoNome || obterNomeFeriadoISO(dataSelecionada);
 
     const selectedDateEl = document.getElementById('admin-lock-selected-date');
     const badge = document.getElementById('admin-lock-badge');
@@ -1768,7 +1777,9 @@ function atualizarStatusBloqueioAdmin() {
     const infoText = document.getElementById('admin-lock-info-text');
 
     if (selectedDateEl) {
-        selectedDateEl.textContent = dataSelecionada ? formatarDataBR(dataSelecionada) : '-';
+        selectedDateEl.textContent = dataSelecionada
+            ? `${formatarDataBR(dataSelecionada)}${nomeFeriado ? ` (${nomeFeriado})` : ''}`
+            : '-';
     }
 
     if (badge) {
@@ -1777,13 +1788,13 @@ function atualizarStatusBloqueioAdmin() {
             badge.innerHTML = `<i class="fa-regular fa-calendar"></i> Selecione uma data`;
         } else if (estaDataTrancada) {
             badge.className = "admin-lock-badge badge-trancado";
-            badge.innerHTML = `<i class="fa-solid fa-lock"></i> Dia Bloqueado`;
+            badge.innerHTML = `<i class="fa-solid fa-lock"></i> Dia Bloqueado${nomeFeriado ? ` (${escaparHTMLAdmin(nomeFeriado)})` : ''}`;
         } else if (estaLiberadaManual) {
             badge.className = "admin-lock-badge badge-liberado";
             badge.innerHTML = `<i class="fa-solid fa-calendar-check"></i> Liberada (Exceção)`;
         } else if (ehPadraoAberto) {
             badge.className = "admin-lock-badge badge-liberado";
-            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${disp.ehFeriado ? 'Liberado (Feriado)' : 'Liberado (Domingo)'}`;
+            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${disp.ehFeriado ? `Liberado (Feriado: ${escaparHTMLAdmin(nomeFeriado)})` : 'Liberado (Domingo)'}`;
         } else {
             badge.className = "admin-lock-badge badge-fechado-padrao";
             badge.innerHTML = `<i class="fa-solid fa-ban"></i> Fechado (Dia Comum)`;
@@ -1827,11 +1838,11 @@ function atualizarStatusBloqueioAdmin() {
         if (!dataSelecionada) {
             infoText.textContent = "Selecione uma data no calendário abaixo para gerenciar bloqueios ou liberações excepcionais.";
         } else if (estaDataTrancada) {
-            infoText.innerHTML = `🔒 <strong>Dia ${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} bloqueado manualmente:</strong> Prioridade máxima ativa. Clientes não podem fazer novas reservas nesta data, mesmo que seja domingo, feriado ou tenha sido liberada antes. Reservas existentes continuam preservadas.`;
+            infoText.innerHTML = `🔒 <strong>Dia ${escaparHTMLAdmin(formatarDataBR(dataSelecionada))}${nomeFeriado ? ` (${escaparHTMLAdmin(nomeFeriado)})` : ''} bloqueado manualmente:</strong> Prioridade máxima ativa. Clientes não podem fazer novas reservas nesta data, mesmo que seja domingo, feriado nacional ou tenha sido liberada antes. Reservas existentes continuam preservadas.`;
         } else if (estaLiberadaManual) {
             infoText.innerHTML = `✅ <strong>Dia ${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} liberado manualmente:</strong> Funcionamento excepcional ativo somente para esta data. Outros dias comuns da semana continuam indisponíveis.`;
         } else if (ehPadraoAberto) {
-            infoText.innerHTML = `📅 <strong>${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} (${disp.ehFeriado ? 'Feriado' : 'Domingo'}):</strong> Aberto pela regra padrão de funcionamento. Caso precise fechar apenas este dia, clique em <strong>Bloquear este dia</strong>.`;
+            infoText.innerHTML = `📅 <strong>${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} (${disp.ehFeriado ? `Feriado Nacional: ${escaparHTMLAdmin(nomeFeriado)}` : 'Domingo'}):</strong> Aberto automaticamente pela regra padrão de funcionamento. Caso o restaurante não funcione neste dia, clique em <strong>Bloquear este dia</strong>.`;
         } else if (ehDiaComumFechado) {
             infoText.innerHTML = `⛔ <strong>${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} (Dia comum da semana):</strong> Indisponível pela regra padrão. Para abrir excepcionalmente apenas esta data, clique em <strong>Liberar data</strong>.`;
         }
@@ -1844,7 +1855,7 @@ function atualizarStatusBloqueioAdmin() {
         btnData.classList.remove('hidden');
         if (estaDataTrancada) {
             badgeData.className = "admin-date-lock-status trancada";
-            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Bloqueada`;
+            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Bloqueada${nomeFeriado ? ` (${escaparHTMLAdmin(nomeFeriado)})` : ''}`;
             btnData.disabled = false;
             btnData.title = "Clique para desbloquear esta data específica";
             btnData.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Desbloquear data</span>`;
@@ -1858,7 +1869,7 @@ function atualizarStatusBloqueioAdmin() {
             btnData.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('liberar', { novoEstado: false })");
         } else if (ehPadraoAberto) {
             badgeData.className = "admin-date-lock-status liberada";
-            badgeData.innerHTML = `<i class="fa-solid fa-circle-check"></i> Data Liberada`;
+            badgeData.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${disp.ehFeriado ? `Feriado: ${escaparHTMLAdmin(nomeFeriado)}` : 'Data Liberada'}`;
             btnData.disabled = false;
             btnData.title = "Clique para bloquear esta data específica";
             btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Bloquear data</span>`;
@@ -1983,6 +1994,7 @@ function renderAdminCalendario() {
         const permitido = ehDataPermitidaAdmin(iso);
         const disp = avaliarDisponibilidadeData(iso, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true);
         const ehFeriado = ehFeriadoISO(iso);
+        const nomeFeriado = disp.feriadoNome || obterNomeFeriadoISO(iso);
         const estaBloqueado = disp.prioridade === 1;
         const estaLiberadoExtra = disp.prioridade === 2;
         const diaComumFechado = disp.prioridade === 4;
@@ -2000,11 +2012,11 @@ function renderAdminCalendario() {
 
         let label = "";
         if (estaBloqueado) {
-            label = `<span class="admin-day-lock-badge"><i class="fa-solid fa-lock"></i> Bloq.</span>`;
+            label = `<span class="admin-day-lock-badge"><i class="fa-solid fa-lock"></i> Bloq.</span>${ehFeriado && nomeFeriado ? `<span class="admin-day-holiday-name" title="${escaparHTMLAdmin(nomeFeriado)}">${escaparHTMLAdmin(nomeFeriado)}</span>` : ""}`;
         } else if (estaLiberadoExtra) {
             label = `<span class="admin-day-release-badge"><i class="fa-solid fa-calendar-check"></i> Extra</span>`;
         } else if (ehFeriado) {
-            label = `<span class="admin-day-label">feriado</span>`;
+            label = `<span class="admin-day-label" title="${escaparHTMLAdmin(nomeFeriado)}">feriado</span><span class="admin-day-holiday-name" title="${escaparHTMLAdmin(nomeFeriado)}">${escaparHTMLAdmin(nomeFeriado)}</span>`;
         }
 
         let badge = "";
@@ -2012,11 +2024,22 @@ function renderAdminCalendario() {
             badge = `<span class="admin-day-reservas">${reservas.length}</span>`;
         }
 
+        const ariaDetalhes = estaBloqueado
+            ? (ehFeriado && nomeFeriado ? ` (Bloqueado • Feriado: ${nomeFeriado})` : ' (Bloqueado)')
+            : (estaLiberadoExtra
+                ? ' (Liberado extra)'
+                : (ehFeriado && nomeFeriado
+                    ? ` (Feriado Nacional: ${nomeFeriado})`
+                    : (diaComumFechado ? ' (Dia comum fechado)' : '')));
+        const titleAttr = ehFeriado && nomeFeriado
+            ? ` title="${escaparHTMLAdmin(`${formatarDataBR(iso)} — Feriado Nacional: ${nomeFeriado}`)}"`
+            : '';
+
         html += `
             <button type="button"
                 class="${classes}"
-                ${permitido ? `onclick="selecionarDataAdmin('${iso}')"` : "disabled"}
-                aria-label="${permitido ? `Selecionar ${formatarDataBR(iso)}${estaBloqueado ? ' (Bloqueado)' : (estaLiberadoExtra ? ' (Liberado extra)' : (diaComumFechado ? ' (Dia comum fechado)' : ''))}` : "Data não disponível"}">
+                ${permitido ? `onclick="selecionarDataAdmin('${iso}')"` : "disabled"}${titleAttr}
+                aria-label="${escaparHTMLAdmin(permitido ? `Selecionar ${formatarDataBR(iso)}${ariaDetalhes}` : "Data não disponível")}">
                 <span class="admin-day-number">${dia}</span>
                 ${label}
                 ${badge}
@@ -2039,6 +2062,7 @@ function renderAdminReservas() {
     atualizarStatusBloqueioAdmin();
 
     const data = adminDataSelecionada;
+    const nomeFeriado = data ? obterNomeFeriadoISO(data) : "";
     const reservas = getReservasDaDataAdmin(data);
     const busca = (document.getElementById("admin-busca")?.value || "")
         .trim()
@@ -2059,7 +2083,7 @@ function renderAdminReservas() {
     });
 
     titulo.textContent = data
-        ? formatarDataBR(data)
+        ? `${formatarDataBR(data)}${nomeFeriado ? ` — ${nomeFeriado}` : ""}`
         : "Selecione uma data";
 
     contador.textContent = `${reservas.length} ${reservas.length === 1 ? "reserva" : "reservas"}`;
@@ -2195,7 +2219,7 @@ function preencherDatasEdicaoAdmin(dataAtual) {
         const disp = avaliarDisponibilidadeData(iso, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true);
         const tag = disp.prioridade === 2
             ? ' (Liberada)'
-            : (disp.ehFeriado ? ' (Feriado)' : (disp.ehDomingo ? ' (Domingo)' : ''));
+            : (disp.ehFeriado ? ` (Feriado: ${disp.feriadoNome || 'Nacional'})` : (disp.ehDomingo ? ' (Domingo)' : ''));
         return `<option value="${iso}">${escaparHTMLAdmin(formatarDataBR(iso) + tag)}</option>`;
     }).join('');
     select.value = dataAtual || '';
