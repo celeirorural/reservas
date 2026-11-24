@@ -127,12 +127,12 @@
                    <h2><i class="fa-solid fa-calendar-days"></i> 2. Data, Horário e Mesa</h2>
 
                    <div class="input-group client-date-group">
-                       <label>Data da Reserva (Domingos e Feriados)</label>
+                       <label>Data da Reserva (Calendário 2026 / 2027)</label>
                        <input type="hidden" id="cli-data">
                        <div class="client-calendar-card" id="client-calendar-card">
                                <div class="client-calendar-head">
                                    <div>
-                                       <span class="client-calendar-caption">Calendário de reservas</span>
+                                       <span class="client-calendar-caption">Calendário de reservas 2026 e 2027</span>
                                        <h3 id="client-month-title">-</h3>
                                    </div>
                                    <div class="client-calendar-nav">
@@ -145,6 +145,8 @@
                                    <span><i class="client-legend-dot selected"></i> Selecionado</span>
                                    <span><i class="client-legend-dot reserva"></i> Tem reserva</span>
                                    <span><i class="client-legend-dot feriado"></i> Feriado</span>
+                                   <span><i class="client-legend-dot liberado"></i> Liberado extra</span>
+                                   <span><i class="client-legend-dot blocked"></i> Bloqueado</span>
                                </div>
                                <div id="client-calendar" class="client-calendar-grid"></div>
                        </div>
@@ -371,31 +373,36 @@
                 <div>
                     <span class="admin-eyebrow"><i class="fa-solid fa-lock"></i> Área administrativa</span>
                     <h2>Reservas</h2>
-                    <p>Consulte os domingos e feriados e veja as reservas abertas de cada data.</p>
+                    <p>Consulte o calendário de 2026 e 2027, gerencie bloqueios individuais, libere datas excepcionais e acompanhe as reservas.</p>
                 </div>
                 <button type="button" class="admin-close-btn" onclick="fecharAreaAdmin()" title="Fechar área administrativa">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <!-- CARD DE CONTROLE DE TRANCAMENTO DE RESERVAS -->
+            <!-- CARD DE CONTROLE DE EXCEÇÕES E BLOQUEIO INDIVIDUAL POR DIA -->
             <div class="card admin-lock-card" id="admin-lock-card">
                 <div class="admin-lock-header">
                     <div class="admin-lock-title-group">
-                        <span class="admin-eyebrow"><i class="fa-solid fa-shield-halved"></i> Controle de Disponibilidade Geral</span>
+                        <span class="admin-eyebrow"><i class="fa-solid fa-shield-halved"></i> Exceções e Bloqueio Individual por Dia</span>
                         <div class="admin-lock-status-indicator">
-                            <span class="admin-lock-label">Status das Reservas:</span>
+                            <span class="admin-lock-label">Data selecionada (<strong id="admin-lock-selected-date">-</strong>):</span>
                             <span id="admin-lock-badge" class="admin-lock-badge badge-liberado">
-                                <i class="fa-solid fa-circle-check"></i> Reservas Liberadas
+                                <i class="fa-solid fa-circle-check"></i> Data Liberada
                             </span>
                         </div>
                     </div>
-                    <button type="button" id="admin-btn-toggle-bloqueio" class="admin-lock-toggle-btn btn-trancar" onclick="abrirModalConfirmacaoBloqueio('global')">
-                        <i class="fa-solid fa-lock"></i> <span>Trancar Reservas</span>
-                    </button>
+                    <div class="admin-lock-actions">
+                        <button type="button" id="admin-btn-liberar-data" class="admin-lock-toggle-btn btn-liberar hidden" onclick="abrirModalConfirmacaoBloqueio('liberar')">
+                            <i class="fa-solid fa-calendar-check"></i> <span>Liberar data</span>
+                        </button>
+                        <button type="button" id="admin-btn-toggle-bloqueio" class="admin-lock-toggle-btn btn-trancar" onclick="abrirModalConfirmacaoBloqueio('data')">
+                            <i class="fa-solid fa-lock"></i> <span>Bloquear este dia</span>
+                        </button>
+                    </div>
                 </div>
                 <p class="admin-lock-info-text" id="admin-lock-info-text">
-                    Quando as reservas estiverem trancadas, a página pública oculta mesas e horários e exibe o aviso de capacidade lotada em tempo real.
+                    Funcionamento padrão: domingos e feriados. Selecione uma data no calendário para liberar excepcionalmente um dia comum ou bloquear individualmente uma data disponível.
                 </p>
             </div>
 
@@ -441,9 +448,25 @@
                     <span><i class="legend-dot legend-selected"></i> Selecionado</span>
                     <span><i class="legend-dot legend-reserva"></i> Tem reserva</span>
                     <span><i class="legend-dot legend-feriado"></i> Feriado</span>
+                    <span><i class="legend-dot legend-liberado"></i> Liberado extra</span>
+                    <span><i class="legend-dot legend-bloqueado"></i> Bloqueado</span>
                 </div>
 
                 <div id="admin-calendar" class="admin-calendar"></div>
+
+                <div id="admin-released-dates-wrap" class="admin-released-chips-wrap hidden">
+                    <div class="admin-released-chips-header">
+                        <span><i class="fa-solid fa-calendar-check"></i> Datas liberadas manualmente (<strong id="admin-released-dates-count">0</strong>)</span>
+                    </div>
+                    <div id="admin-released-dates-list" class="admin-blocked-chips-list"></div>
+                </div>
+
+                <div id="admin-blocked-dates-wrap" class="admin-blocked-chips-wrap hidden">
+                    <div class="admin-blocked-chips-header">
+                        <span><i class="fa-solid fa-ban"></i> Datas bloqueadas individualmente (<strong id="admin-blocked-dates-count">0</strong>)</span>
+                    </div>
+                    <div id="admin-blocked-dates-list" class="admin-blocked-chips-list"></div>
+                </div>
             </div>
 
             <div class="card admin-list-card">

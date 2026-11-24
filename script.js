@@ -1,38 +1,88 @@
-// FERIADOS CADASTRADOS ATÉ O FIM DO ANO
+// FERIADOS NACIONAIS, ESTADUAL (SP - 09/07) E MUNICIPAIS DE BAURU/SP (CORPUS CHRISTI E 01/08) + CARNAVAL PARA 2026 E 2027
        const feriadosPermitidos = [
-           "2026-01-01", "2026-03-03", "2026-04-03", "2026-04-21", 
-           "2026-05-01", "2026-06-04", "2026-09-07", "2026-10-12", 
-           "2026-11-02", "2026-11-15", "2026-11-20", "2026-12-25"
+           // 2026
+           "2026-01-01", // Confraternização Universal
+           "2026-02-17", // Carnaval
+           "2026-04-03", // Paixão de Cristo (Sexta-feira Santa)
+           "2026-04-21", // Tiradentes
+           "2026-05-01", // Dia do Trabalho
+           "2026-06-04", // Corpus Christi (Municipal Bauru/SP)
+           "2026-07-09", // Revolução Constitucionalista (Estadual SP)
+           "2026-08-01", // Aniversário de Bauru (Municipal Bauru/SP)
+           "2026-09-07", // Independência do Brasil
+           "2026-10-12", // Nossa Senhora Aparecida
+           "2026-11-02", // Finados
+           "2026-11-15", // Proclamação da República
+           "2026-11-20", // Consciência Negra
+           "2026-12-25", // Natal
+           // 2027
+           "2027-01-01", // Confraternização Universal
+           "2027-02-09", // Carnaval
+           "2027-03-26", // Paixão de Cristo (Sexta-feira Santa)
+           "2027-04-21", // Tiradentes
+           "2027-05-01", // Dia do Trabalho
+           "2027-05-27", // Corpus Christi (Municipal Bauru/SP)
+           "2027-07-09", // Revolução Constitucionalista (Estadual SP)
+           "2027-08-01", // Aniversário de Bauru (Municipal Bauru/SP)
+           "2027-09-07", // Independência do Brasil
+           "2027-10-12", // Nossa Senhora Aparecida
+           "2027-11-02", // Finados
+           "2027-11-15", // Proclamação da República
+           "2027-11-20", // Consciência Negra
+           "2027-12-25"  // Natal
        ];
 
-       // FUNÇÃO UTILITÁRIA PARA FORMATAR DATA EM YYYY-MM-DD RESPEITANDO O FUSO HORÁRIO LOCAL
-       function obterDataFormatadaISO(dataObj) {
-           const ano = dataObj.getFullYear();
-           const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
-           const dia = String(dataObj.getDate()).padStart(2, '0');
-           return `${ano}-${mes}-${dia}`;
-       }
+        const ANO_MINIMO_CALENDARIO = 2026;
+        const ANO_MAXIMO_CALENDARIO = 2027;
 
-       // FUNÇÃO PARA CALCULAR O PRÓXIMO DOMINGO NO FUSO LOCAL
-       function obterProximoDomingoLocal() {
-           const hoje = new Date();
-           let proxDom = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-           while (proxDom.getDay() !== 0) {
-               proxDom.setDate(proxDom.getDate() + 1);
-           }
-           return obterDataFormatadaISO(proxDom);
-       }
+        // FUNÇÃO UTILITÁRIA PARA FORMATAR DATA EM YYYY-MM-DD RESPEITANDO O FUSO HORÁRIO LOCAL
+        function obterDataFormatadaISO(dataObj) {
+            const ano = dataObj.getFullYear();
+            const mes = String(dataObj.getMonth() + 1).padStart(2, '0');
+            const dia = String(dataObj.getDate()).padStart(2, '0');
+            return `${ano}-${mes}-${dia}`;
+        }
 
-       document.addEventListener("DOMContentLoaded", () => {
-           const campoData = document.getElementById('cli-data');
-           const hojeObj = new Date();
-           const hojeISO = obterDataFormatadaISO(hojeObj);
-           
-           campoData.min = hojeISO;
-           campoData.max = `${hojeObj.getFullYear()}-12-31`;
+        function ehDataValidaISO(iso) {
+            const str = String(iso || '').trim();
+            const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+            if (!match) return false;
+            const ano = Number(match[1]);
+            const mes = Number(match[2]);
+            const dia = Number(match[3]);
+            if (ano < ANO_MINIMO_CALENDARIO || ano > ANO_MAXIMO_CALENDARIO) return false;
+            const d = new Date(ano, mes - 1, dia);
+            return d.getFullYear() === ano && d.getMonth() === mes - 1 && d.getDate() === dia;
+        }
 
-           // SELECIONA O PRÓXIMO DOMINGO DISPONÍVEL COMO PADRÃO (FUSO LOCAL)
-           campoData.value = obterProximoDomingoLocal();
+        function ehDataPassadaISO(iso) {
+            const d = dataLocalPorISO(iso);
+            if (!d) return true;
+            const hoje = new Date();
+            const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+            return d < inicioHoje;
+        }
+
+        // FUNÇÃO LEGADA MANTIDA PARA COMPATIBILIDADE
+        function obterProximoDomingoLocal() {
+            const hoje = new Date();
+            let proxDom = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+            while (proxDom.getDay() !== 0) {
+                proxDom.setDate(proxDom.getDate() + 1);
+            }
+            return obterDataFormatadaISO(proxDom);
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const campoData = document.getElementById('cli-data');
+            const hojeObj = new Date();
+            const hojeISO = obterDataFormatadaISO(hojeObj);
+
+            campoData.min = hojeISO;
+            campoData.max = `${ANO_MAXIMO_CALENDARIO}-12-31`;
+
+            // SELECIONA A PRÓXIMA DATA DISPONÍVEL EM 2026/2027 COMO PADRÃO (FUSO LOCAL)
+            campoData.value = obterProximaDataPermitidaCliente(hojeObj);
 
            // INICIALIZA ESTILO E POP-UP
            const stylePopup = document.createElement('style');
@@ -115,22 +165,16 @@
            });
        });
 
-       // VALIDAR SE A DATA É DOMINGO OU FERIADO CADASTRADO
+       // VALIDAR SE A DATA ESTÁ DENTRO DAS REGRAS DE FUNCIONAMENTO E NÃO PASSOU
        function validarDataSelecionada() {
            const campoData = document.getElementById('cli-data');
            const dataValor = campoData.value;
            if (!dataValor) return;
 
-           const partes = dataValor.split('-');
-           const dataObj = new Date(partes[0], partes[1] - 1, partes[2]);
-           const diaSemana = dataObj.getDay();
-
-           const ehDomingo = (diaSemana === 0);
-           const ehFeriado = feriadosPermitidos.includes(dataValor);
-
-           if (!ehDomingo && !ehFeriado) {
-               alert("O Celeiro funciona exclusivamente aos DOMINGOS e FERIADOS. Por favor, escolha uma data válida.");
-               campoData.value = obterProximoDomingoLocal();
+           const disp = avaliarDisponibilidadeData(dataValor);
+           if (!disp.disponivel) {
+               mostrarPopupNotificacao(disp.mensagem || "Reservas disponíveis somente aos domingos, feriados ou em datas liberadas.", "fa-circle-exclamation");
+               campoData.value = obterProximaDataPermitidaCliente(new Date());
            }
        }
 
@@ -222,7 +266,8 @@
            bloqueio: {
                trancado: false,
                mensagem: "Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.",
-               datasTrancadas: {}
+               datasTrancadas: {},
+               datasLiberadas: {}
            }
        };
        let dadosReservaAtual = null;
@@ -247,20 +292,26 @@
                    : {};
                if (dados.configCasa) estadoGlobal.configCasa = dados.configCasa;
 
-               const trancadoGlobal = Boolean(
-                   dados.bloqueio?.trancado ?? dados.configCasa?.reservasTrancadas ?? false
-               );
-               const datasTrancadas = dados.bloqueio?.datasTrancadas || dados.configCasa?.datasTrancadas || {};
+               const datasTrancadas = {
+                   ...(dados.configCasa?.datasTrancadas && typeof dados.configCasa.datasTrancadas === 'object' ? dados.configCasa.datasTrancadas : {}),
+                   ...(dados.bloqueio?.datasTrancadas && typeof dados.bloqueio.datasTrancadas === 'object' ? dados.bloqueio.datasTrancadas : {})
+               };
+
+               const datasLiberadas = {
+                   ...(dados.configCasa?.datasLiberadas && typeof dados.configCasa.datasLiberadas === 'object' ? dados.configCasa.datasLiberadas : {}),
+                   ...(dados.bloqueio?.datasLiberadas && typeof dados.bloqueio.datasLiberadas === 'object' ? dados.bloqueio.datasLiberadas : {})
+               };
 
                estadoGlobal.bloqueio = {
-                   trancado: trancadoGlobal,
+                   trancado: false,
                    mensagem: dados.bloqueio?.mensagem || "Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.",
-                   datasTrancadas: datasTrancadas
+                   datasTrancadas: datasTrancadas,
+                   datasLiberadas: datasLiberadas
                };
            } else {
                estadoGlobal.reservas = [];
                estadoGlobal.ocupacaoMesas = {};
-               estadoGlobal.bloqueio = { trancado: false, datasTrancadas: {} };
+               estadoGlobal.bloqueio = { trancado: false, datasTrancadas: {}, datasLiberadas: {} };
            }
        }
 
@@ -360,44 +411,220 @@
            }
        });
 
+       let clienteDataEscolhidaManualmente = false;
+       let clienteMesAtual = new Date();
+       let clienteDataSelecionada = null;
+
        dbRef.on('value', (snapshot) => {
            aplicarDadosSnapshotGlobal(snapshot.val());
+           if (
+               !clienteDataEscolhidaManualmente &&
+               (!clienteDataSelecionada || !ehDataPermitidaCliente(clienteDataSelecionada) || verificarSeReservasTrancadas(clienteDataSelecionada))
+           ) {
+               const proxLivre = obterProximaDataPermitidaCliente(new Date());
+               if (proxLivre) {
+                   clienteDataSelecionada = proxLivre;
+                   const campo = document.getElementById('cli-data');
+                   if (campo) campo.value = proxLivre;
+                   const d = dataLocalPorISO(proxLivre);
+                   if (d) clienteMesAtual = new Date(d.getFullYear(), d.getMonth(), 1);
+               }
+           }
            atualizarInterfaceBloqueioCliente();
            atualizarSelectMesas();
            renderCalendarioCliente();
            atualizarAdminSeAberto();
        });
 
-       // VERIFICA SE O BLOQUEIO DE RESERVAS ESTÁ ATIVO (GLOBAL OU ESPECÍFICO DE UMA DATA)
-       function verificarSeReservasTrancadas(dataISO) {
-           if (!estadoGlobal?.bloqueio) return false;
-           if (estadoGlobal.bloqueio.trancado === true || estadoGlobal.configCasa?.reservasTrancadas === true) {
-               return true;
-           }
-           if (dataISO && estadoGlobal.bloqueio.datasTrancadas) {
-               const keyOriginal = String(dataISO);
-               const keyUnder = keyOriginal.replace(/-/g, '_');
-               if (estadoGlobal.bloqueio.datasTrancadas[keyOriginal] === true || estadoGlobal.bloqueio.datasTrancadas[keyUnder] === true) {
-                   return true;
-               }
-           }
-           return false;
+       function normalizarChaveDataISO(chave) {
+           const str = String(chave || '').trim();
+           if (/^\d{4}_\d{2}_\d{2}$/.test(str)) return str.replace(/_/g, '-');
+           if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+           return '';
        }
 
-       // ATUALIZA A INTERFACE PÚBLICA DO CLIENTE QUANDO O BLOQUEIO MUDA
+       function verificarDataEspecificaTrancada(dataISO, bloqueioObj = estadoGlobal?.bloqueio, configObj = estadoGlobal?.configCasa) {
+           if (!dataISO) return false;
+           const keyOriginal = String(dataISO);
+           const keyUnder = keyOriginal.replace(/-/g, '_');
+           const mapas = [bloqueioObj?.datasTrancadas, configObj?.datasTrancadas];
+           return mapas.some((mapa) => Boolean(mapa && (mapa[keyOriginal] === true || mapa[keyUnder] === true)));
+       }
+
+       function verificarDataEspecificaLiberada(dataISO, bloqueioObj = estadoGlobal?.bloqueio, configObj = estadoGlobal?.configCasa) {
+           if (!dataISO) return false;
+           const keyOriginal = String(dataISO);
+           const keyUnder = keyOriginal.replace(/-/g, '_');
+           const mapas = [bloqueioObj?.datasLiberadas, configObj?.datasLiberadas];
+           return mapas.some((mapa) => Boolean(mapa && (mapa[keyOriginal] === true || mapa[keyUnder] === true)));
+       }
+
+       function ehDomingoISO(dataISO) {
+           const d = dataLocalPorISO(dataISO);
+           return Boolean(d && d.getDay() === 0);
+       }
+
+       function ehFeriadoISO(dataISO) {
+           return feriadosPermitidos.includes(String(dataISO || '').trim());
+       }
+
+       function ehFuncionamentoPadraoISO(dataISO) {
+           return ehDomingoISO(dataISO) || ehFeriadoISO(dataISO);
+       }
+
+       /*
+        * ORDEM DE PRIORIDADE RIGOROSA DE DISPONIBILIDADE:
+        * 1. Data bloqueada manualmente: NÃO permite reservas.
+        * 2. Data liberada manualmente: permite reservas.
+        * 3. Domingo ou feriado: permite reservas.
+        * 4. Qualquer outro dia: NÃO permite reservas.
+        */
+       function avaliarDisponibilidadeData(dataISO, bloqueioObj = estadoGlobal?.bloqueio, configObj = estadoGlobal?.configCasa, ignorarPassado = false) {
+           const iso = String(dataISO || '').trim();
+           if (!iso || !ehDataValidaISO(iso)) {
+               return {
+                   data: iso,
+                   disponivel: false,
+                   prioridade: 0,
+                   motivo: 'data_invalida',
+                   mensagem: 'Por favor, selecione uma data válida dentro do calendário de 2026 ou 2027.'
+               };
+           }
+
+           if (!ignorarPassado && ehDataPassadaISO(iso)) {
+               return {
+                   data: iso,
+                   disponivel: false,
+                   prioridade: 0,
+                   motivo: 'data_passada',
+                   mensagem: 'Não é possível realizar reservas para datas que já passaram.'
+               };
+           }
+
+           const bloqueadaManual = verificarDataEspecificaTrancada(iso, bloqueioObj, configObj);
+           if (bloqueadaManual) {
+               return {
+                   data: iso,
+                   disponivel: false,
+                   prioridade: 1,
+                   motivo: 'bloqueada_manual',
+                   ehDomingo: ehDomingoISO(iso),
+                   ehFeriado: ehFeriadoISO(iso),
+                   bloqueadaManual: true,
+                   liberadaManual: verificarDataEspecificaLiberada(iso, bloqueioObj, configObj),
+                   mensagem: 'Esta data está bloqueada para novas reservas no momento. Escolha outra data disponível.'
+               };
+           }
+
+           const liberadaManual = verificarDataEspecificaLiberada(iso, bloqueioObj, configObj);
+           if (liberadaManual) {
+               return {
+                   data: iso,
+                   disponivel: true,
+                   prioridade: 2,
+                   motivo: 'liberada_manual',
+                   ehDomingo: ehDomingoISO(iso),
+                   ehFeriado: ehFeriadoISO(iso),
+                   bloqueadaManual: false,
+                   liberadaManual: true,
+                   mensagem: 'Data liberada manualmente pela administração.'
+               };
+           }
+
+           const domingo = ehDomingoISO(iso);
+           const feriado = ehFeriadoISO(iso);
+           if (domingo || feriado) {
+               return {
+                   data: iso,
+                   disponivel: true,
+                   prioridade: 3,
+                   motivo: feriado ? 'feriado' : 'domingo',
+                   ehDomingo: domingo,
+                   ehFeriado: feriado,
+                   bloqueadaManual: false,
+                   liberadaManual: false,
+                   mensagem: feriado ? 'Feriado com funcionamento normal para reservas.' : 'Domingo com funcionamento normal para reservas.'
+               };
+           }
+
+           return {
+               data: iso,
+               disponivel: false,
+               prioridade: 4,
+               motivo: 'dia_comum_indisponivel',
+               ehDomingo: false,
+               ehFeriado: false,
+               bloqueadaManual: false,
+               liberadaManual: false,
+               mensagem: 'Reservas são permitidas somente aos domingos, feriados ou em datas liberadas pela administração.'
+           };
+       }
+
+       function obterListaDatasTrancadas() {
+           const conjunto = new Set();
+           const mapas = [estadoGlobal?.bloqueio?.datasTrancadas, estadoGlobal?.configCasa?.datasTrancadas];
+           mapas.forEach((mapa) => {
+               if (!mapa || typeof mapa !== 'object') return;
+               Object.entries(mapa).forEach(([chave, valor]) => {
+                   if (valor === true) {
+                       const iso = normalizarChaveDataISO(chave);
+                       if (iso && ehDataValidaISO(iso)) conjunto.add(iso);
+                   }
+               });
+           });
+           return Array.from(conjunto).sort();
+       }
+
+       function obterListaDatasLiberadas() {
+           const conjunto = new Set();
+           const mapas = [estadoGlobal?.bloqueio?.datasLiberadas, estadoGlobal?.configCasa?.datasLiberadas];
+           mapas.forEach((mapa) => {
+               if (!mapa || typeof mapa !== 'object') return;
+               Object.entries(mapa).forEach(([chave, valor]) => {
+                   if (valor === true) {
+                       const iso = normalizarChaveDataISO(chave);
+                       if (iso && ehDataValidaISO(iso)) conjunto.add(iso);
+                   }
+               });
+           });
+           return Array.from(conjunto).sort();
+       }
+
+       // VERIFICA SE A DATA ESPECÍFICA ESTÁ BLOQUEADA INDIVIDUALMENTE
+       function verificarSeReservasTrancadas(dataISO) {
+           if (!dataISO) return false;
+           return verificarDataEspecificaTrancada(dataISO);
+       }
+
+       // ATUALIZA A INTERFACE PÚBLICA DO CLIENTE CONFORME AS REGRAS DE DISPONIBILIDADE
        function atualizarInterfaceBloqueioCliente() {
            const campoData = document.getElementById('cli-data');
            const dataSelecionada = campoData ? campoData.value : (typeof clienteDataSelecionada !== 'undefined' ? clienteDataSelecionada : '');
-           const estaTrancado = verificarSeReservasTrancadas(dataSelecionada);
+           const disp = dataSelecionada
+               ? avaliarDisponibilidadeData(dataSelecionada)
+               : { disponivel: false, prioridade: 0, motivo: 'data_invalida' };
+           const indisponivel = !disp.disponivel;
+           const bloqueadaManual = disp.prioridade === 1;
 
            const bannerBloqueio = document.getElementById('container-bloqueio-cliente');
+           const bannerTitulo = bannerBloqueio?.querySelector('.banner-bloqueio-titulo');
+           const bannerMsg = bannerBloqueio?.querySelector('.banner-bloqueio-mensagem');
            const containerHorarioMesa = document.getElementById('container-horario-mesa');
            const selectHorario = document.getElementById('cli-horario');
            const selectMesa = document.getElementById('cli-mesa');
            const btnSubmit = document.getElementById('btn-submit');
 
            if (bannerBloqueio) {
-               if (estaTrancado) {
+               if (indisponivel) {
+                   if (bannerTitulo && bannerMsg) {
+                       if (bloqueadaManual) {
+                           bannerTitulo.textContent = 'Capacidade Esgotada';
+                           bannerMsg.textContent = 'Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.';
+                       } else {
+                           bannerTitulo.textContent = 'Dia Indisponível para Reservas';
+                           bannerMsg.textContent = 'Funcionamos regularmente aos domingos e feriados. Selecione uma data disponível no calendário acima.';
+                       }
+                   }
                    bannerBloqueio.classList.remove('hidden');
                } else {
                    bannerBloqueio.classList.add('hidden');
@@ -405,7 +632,7 @@
            }
 
            if (containerHorarioMesa) {
-               if (estaTrancado) {
+               if (indisponivel) {
                    containerHorarioMesa.classList.add('hidden');
                } else {
                    containerHorarioMesa.classList.remove('hidden');
@@ -413,13 +640,13 @@
            }
 
            if (selectHorario) {
-               selectHorario.disabled = estaTrancado;
+               selectHorario.disabled = indisponivel;
            }
 
            if (selectMesa) {
-               selectMesa.disabled = estaTrancado;
-               if (estaTrancado) {
-                   selectMesa.innerHTML = '<option value="">Reservas encerradas para esta data</option>';
+               selectMesa.disabled = indisponivel;
+               if (indisponivel) {
+                   selectMesa.innerHTML = `<option value="">${bloqueadaManual ? 'Reservas encerradas para esta data' : 'Data indisponível para reservas'}</option>`;
                    selectMesa.value = '';
                }
            }
@@ -428,10 +655,12 @@
            sincronizarCustomSelect('cli-mesa');
 
            if (btnSubmit) {
-               if (estaTrancado) {
+               if (indisponivel) {
                    btnSubmit.disabled = true;
                    btnSubmit.classList.add('btn-submit-bloqueado');
-                   btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS • CAPACIDADE LOTADA`;
+                   btnSubmit.innerHTML = bloqueadaManual
+                       ? `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS • CAPACIDADE LOTADA`
+                       : `<i class="fa-solid fa-calendar-xmark"></i> DATA INDISPONÍVEL PARA RESERVAS`;
                } else {
                    btnSubmit.disabled = false;
                    btnSubmit.classList.remove('btn-submit-bloqueado');
@@ -446,7 +675,7 @@
        // OBTÉM AS PRÓXIMAS MESAS DISPONÍVEIS NA SEQUÊNCIA NUMÉRICA CRESCENTE
        function obterProximasMesasLivres(dataISO, limite = LIMITE_MESAS_SEQUENCIA) {
            if (!dataISO) return [];
-           if (verificarSeReservasTrancadas(dataISO)) return [];
+           if (!avaliarDisponibilidadeData(dataISO).disponivel) return [];
            const totalMesas = estadoGlobal.configCasa?.totalMesas || 100;
            const mesasOcupadas = obterMesasOcupadasNaData(dataISO);
            const mesasLivres = [];
@@ -476,9 +705,10 @@
                return;
            }
 
-           // SE AS RESERVAS ESTIVEREM TRANCADAS PARA ESTA DATA, NÃO EXIBE NÚMEROS DE MESAS
-           if (verificarSeReservasTrancadas(dataSelecionada)) {
-               selectMesa.innerHTML = '<option value="">Reservas encerradas para esta data</option>';
+           // SE A DATA NÃO ESTIVER DISPONÍVEL PELA REGRA DE PRIORIDADE, NÃO EXIBE MESAS
+           const dispData = avaliarDisponibilidadeData(dataSelecionada);
+           if (!dispData.disponivel) {
+               selectMesa.innerHTML = `<option value="">${dispData.prioridade === 1 ? 'Reservas encerradas para esta data' : 'Data indisponível para reservas'}</option>`;
                selectMesa.value = '';
                selectMesa.disabled = true;
                sincronizarCustomSelect('cli-mesa');
@@ -529,8 +759,6 @@
 /* ============================================================
    CALENDÁRIO DO CLIENTE
    ============================================================ */
-let clienteMesAtual = new Date();
-let clienteDataSelecionada = null;
 const nomesMesesCliente = [
     'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
@@ -538,26 +766,36 @@ const nomesMesesCliente = [
 const nomesDiasCliente = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 
 function dataLocalPorISO(iso){
-    const p=String(iso||'').split('-');
-    if(p.length!==3) return null;
-    return new Date(Number(p[0]),Number(p[1])-1,Number(p[2]));
+    const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso||'').trim());
+    if(!match) return null;
+    const ano=Number(match[1]);
+    const mes=Number(match[2]);
+    const dia=Number(match[3]);
+    const d=new Date(ano,mes-1,dia);
+    if(d.getFullYear()!==ano || d.getMonth()!==mes-1 || d.getDate()!==dia) return null;
+    return d;
 }
 
 function ehDataPermitidaCliente(iso){
-    const d=dataLocalPorISO(iso);
-    if(!d) return false;
-    const hoje=new Date();
-    const inicioHoje=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
-    if(d < inicioHoje) return false;
-    return d.getDay()===0 || feriadosPermitidos.includes(iso);
+    return avaliarDisponibilidadeData(iso).disponivel === true;
 }
 
 function obterProximaDataPermitidaCliente(dataBase=new Date()){
-    const d=new Date(dataBase.getFullYear(),dataBase.getMonth(),dataBase.getDate());
-    for(let i=0;i<370;i++){
-        const iso=obterDataFormatadaISO(d);
-        if(ehDataPermitidaCliente(iso)) return iso;
-        d.setDate(d.getDate()+1);
+    const hoje=new Date();
+    const inicioHoje=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
+    const min2026=new Date(ANO_MINIMO_CALENDARIO,0,1);
+    const base=new Date(dataBase.getFullYear(),dataBase.getMonth(),dataBase.getDate());
+    let inicio=base < inicioHoje ? inicioHoje : base;
+    if(inicio < min2026) inicio=min2026;
+    const fimCalendario=new Date(ANO_MAXIMO_CALENDARIO,11,31);
+
+    const cursor=new Date(inicio.getFullYear(),inicio.getMonth(),inicio.getDate());
+    while(cursor<=fimCalendario){
+        const iso=obterDataFormatadaISO(cursor);
+        if(ehDataPermitidaCliente(iso)){
+            return iso;
+        }
+        cursor.setDate(cursor.getDate()+1);
     }
     return '';
 }
@@ -574,7 +812,8 @@ function mudarMesCliente(delta){
     const nova=new Date(clienteMesAtual.getFullYear(),clienteMesAtual.getMonth()+delta,1);
     const hoje=new Date();
     const mesAtualReal=new Date(hoje.getFullYear(),hoje.getMonth(),1);
-    if(nova < mesAtualReal) return;
+    const mesMaxCalendario=new Date(ANO_MAXIMO_CALENDARIO,11,1);
+    if(nova < mesAtualReal || nova > mesMaxCalendario) return;
     clienteMesAtual=nova;
     renderCalendarioCliente();
 }
@@ -584,7 +823,8 @@ function irParaMesAtualCliente(){
     clienteMesAtual=new Date(hoje.getFullYear(),hoje.getMonth(),1);
     const campo=document.getElementById('cli-data');
     const atual=campo?.value;
-    clienteDataSelecionada=ehDataPermitidaCliente(atual)?atual:obterProximaDataPermitidaCliente(hoje);
+    const atualValida=atual && ehDataPermitidaCliente(atual);
+    clienteDataSelecionada=atualValida?atual:obterProximaDataPermitidaCliente(hoje);
     if(campo) campo.value=clienteDataSelecionada;
     atualizarInterfaceBloqueioCliente();
     atualizarSelectMesas();
@@ -592,7 +832,16 @@ function irParaMesAtualCliente(){
 }
 
 function selecionarDataCliente(iso){
-    if(!ehDataPermitidaCliente(iso)) return;
+    const disp = avaliarDisponibilidadeData(iso);
+    if(!disp.disponivel){
+        if(disp.prioridade === 1){
+            mostrarPopupNotificacao('Esta data está bloqueada para novas reservas.', 'fa-lock');
+        } else if(disp.prioridade === 4){
+            mostrarPopupNotificacao('Reservas disponíveis somente aos domingos, feriados ou em datas liberadas.', 'fa-calendar-xmark');
+        }
+        return;
+    }
+    clienteDataEscolhidaManualmente=true;
     ocultarAlertaConflitoMesa();
     clienteDataSelecionada=iso;
     const campo=document.getElementById('cli-data');
@@ -615,9 +864,12 @@ function renderCalendarioCliente(){
 
     const hoje=new Date();
     const mesHoje=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+    const mesMaxCalendario=new Date(ANO_MAXIMO_CALENDARIO,11,1);
     const podeVoltar=clienteMesAtual>mesHoje;
+    const podeAvancar=clienteMesAtual<mesMaxCalendario;
     const botoes=document.querySelectorAll('.client-calendar-nav button');
     if(botoes[0]) botoes[0].disabled=!podeVoltar;
+    if(botoes[2]) botoes[2].disabled=!podeAvancar;
 
     let html=nomesDiasCliente.map(d=>`<div class="client-weekday">${d}</div>`).join('');
     const primeiroDia=new Date(ano,mes,1).getDay();
@@ -625,18 +877,39 @@ function renderCalendarioCliente(){
 
     for(let i=0;i<primeiroDia;i++) html+=`<button type="button" class="client-day empty" tabindex="-1" aria-hidden="true"></button>`;
 
+    const inicioHoje=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
+    const hojeISO=obterDataFormatadaISO(hoje);
+
     for(let dia=1;dia<=totalDias;dia++){
         const d=new Date(ano,mes,dia);
         const iso=obterDataFormatadaISO(d);
-        const permitido=ehDataPermitidaCliente(iso);
-        const feriado=feriadosPermitidos.includes(iso);
-        const trancado=permitido && verificarSeReservasTrancadas(iso);
+        const disp=avaliarDisponibilidadeData(iso);
+        const passada=d<inicioHoje;
+        const feriado=ehFeriadoISO(iso);
+        const trancado=!passada && disp.prioridade===1;
+        const liberadoExtra=!passada && disp.prioridade===2;
+        const clicavel=disp.disponivel;
         const reservas=getReservasDaDataCliente(iso);
-        const hojeISO=obterDataFormatadaISO(hoje);
-        const classes=['client-day',permitido?'valid':'',feriado?'feriado':'',trancado?'lotado':'',iso===clienteDataSelecionada?'selected':'',iso===hojeISO?'today':'',d<new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())?'past':''].filter(Boolean).join(' ');
-        const label=feriado?'<span class="client-day-label">FERIADO</span>':(trancado?'<span class="client-day-label" style="background:rgba(224,130,63,0.3);color:var(--terracota-sol);">LOTADO</span>':'');
+        const classes=[
+            'client-day',
+            clicavel?'valid':'',
+            feriado?'feriado':'',
+            liberadoExtra?'released':'',
+            trancado?'blocked lotado':'',
+            (iso===clienteDataSelecionada && clicavel)?'selected':'',
+            iso===hojeISO?'today':'',
+            passada?'past':''
+        ].filter(Boolean).join(' ');
+        const label=trancado
+            ?'<span class="client-day-label">BLOQUEADO</span>'
+            :(liberadoExtra
+                ?'<span class="client-day-label">LIBERADO</span>'
+                :(feriado?'<span class="client-day-label">FERIADO</span>':''));
         const badge=reservas.length?`<span class="client-day-reservas">${reservas.length}</span>`:'';
-        html+=`<button type="button" class="${classes}" ${permitido?`onclick="selecionarDataCliente('${iso}')"`: 'disabled'} aria-label="${permitido?'Selecionar '+formatarDataBR(iso)+(trancado?' (Lotado)':''):'Data indisponível'}"><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
+        const ariaLabel=clicavel
+            ?`Selecionar ${formatarDataBR(iso)}${liberadoExtra?' (Liberado extra)':(feriado?' (Feriado)':'')}`
+            :(trancado?'Data bloqueada para reservas':'Data indisponível');
+        html+=`<button type="button" class="${classes}" ${clicavel?`onclick="selecionarDataCliente('${iso}')"`:'disabled'} aria-label="${ariaLabel}"><span class="client-day-number">${dia}</span>${label}${badge}</button>`;
     }
     grid.innerHTML=html;
 }
@@ -645,10 +918,12 @@ function inicializarCalendarioCliente(){
     const campo=document.getElementById('cli-data');
     if(!campo) return;
     const hoje=new Date();
-    const inicial=campo.value && ehDataPermitidaCliente(campo.value) ? campo.value : obterProximaDataPermitidaCliente(hoje);
+    const inicial=campo.value && ehDataPermitidaCliente(campo.value) && !verificarSeReservasTrancadas(campo.value)
+        ? campo.value
+        : obterProximaDataPermitidaCliente(hoje);
     clienteDataSelecionada=inicial;
     campo.value=inicial;
-    const d=dataLocalPorISO(inicial) || hoje;
+    const d=dataLocalPorISO(inicial) || new Date(Math.min(ANO_MAXIMO_CALENDARIO, Math.max(ANO_MINIMO_CALENDARIO, hoje.getFullYear())), hoje.getMonth(), 1);
     clienteMesAtual=new Date(d.getFullYear(),d.getMonth(),1);
     atualizarInterfaceBloqueioCliente();
     renderCalendarioCliente();
@@ -763,8 +1038,28 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
                    return;
                }
 
-               if (!dataReserva) {
-                   alert("Por favor, selecione uma data válida.");
+               if (!dataReserva || !ehDataValidaISO(dataReserva)) {
+                   mostrarAlertaConflitoMesa("Por favor, selecione uma data válida dentro do calendário de 2026 ou 2027.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
+
+               if (ehDataPassadaISO(dataReserva)) {
+                   mostrarAlertaConflitoMesa("Não é possível realizar reservas para datas que já passaram.");
+                   restaurarBotaoPadrao();
+                   return;
+               }
+
+               const dispLocal = avaliarDisponibilidadeData(dataReserva);
+               if (!dispLocal.disponivel) {
+                   mostrarAlertaConflitoMesa(dispLocal.mensagem);
+                   atualizarInterfaceBloqueioCliente();
+                   renderCalendarioCliente();
+                   return;
+               }
+
+               if (!['11:30', '11:45', '12:00'].includes(horario)) {
+                   mostrarAlertaConflitoMesa("Selecione um horário válido para a reserva (11:30, 11:45 ou 12:00).");
                    restaurarBotaoPadrao();
                    return;
                }
@@ -789,17 +1084,49 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
 
                // 1. CONSULTA EM TEMPO REAL DIRETAMENTE NO FIREBASE ANTES DE CONFIRMAR
                const snapAtualizado = await dbRef.once('value');
-               aplicarDadosSnapshotGlobal(snapAtualizado.val());
+               const valBanco = snapAtualizado.val();
+               aplicarDadosSnapshotGlobal(valBanco);
 
-               // VERIFICAÇÃO DE BLOQUEIO GERAL/DATA COM DADOS ATUALIZADOS DO BANCO
-               if (verificarSeReservasTrancadas(dataReserva)) {
-                   alert("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão.");
+               // VERIFICAÇÃO RIGOROSA DE DISPONIBILIDADE (PRIORIDADE 1..4) COM DADOS ATUALIZADOS DO BANCO
+               const dispBanco = avaliarDisponibilidadeData(dataReserva, valBanco?.bloqueio, valBanco?.configCasa);
+               if (!dispBanco.disponivel) {
+                   mostrarAlertaConflitoMesa(dispBanco.mensagem);
                    atualizarInterfaceBloqueioCliente();
-                   if (btnSubmit) {
-                       btnSubmit.disabled = true;
-                       btnSubmit.innerHTML = `<i class="fa-solid fa-lock"></i> RESERVAS TRANCADAS`;
-                   }
+                   renderCalendarioCliente();
                    return;
+               }
+
+               // 1b. VALIDAÇÃO AUTORITATIVA NO BACKEND (/api/reservas/validar) QUANDO HOSPEDADO COM SERVIDOR EXPRESS
+               if (typeof fetch === 'function') {
+                   try {
+                       const backendResp = await fetch('/api/reservas/validar', {
+                           method: 'POST',
+                           headers: { 'Content-Type': 'application/json' },
+                           body: JSON.stringify({
+                               data: dataReserva,
+                               horario,
+                               mesa: mesaNum,
+                               adultos,
+                               kids05,
+                               kids610,
+                               nome
+                           })
+                       });
+                       if ([400, 403, 409].includes(backendResp.status)) {
+                           const backendData = await backendResp.json().catch(() => ({}));
+                           const msgErro = backendData?.message || dispBanco.mensagem || "Esta data não permite novas reservas.";
+                           mostrarAlertaConflitoMesa(msgErro);
+                           atualizarInterfaceBloqueioCliente();
+                           atualizarSelectMesas();
+                           renderCalendarioCliente();
+                           if (backendResp.status === 409) {
+                               restaurarBotaoPadrao();
+                           }
+                           return;
+                       }
+                   } catch (backendErr) {
+                       // Ambiente estático sem backend Express; validação segue via RTDB + database.rules.json
+                   }
                }
 
                // VERIFICAÇÃO REAL DE OCUPAÇÃO DA MESA NA DATA NO BANCO DE DADOS
@@ -896,6 +1223,23 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
                    return;
                }
 
+               // 3b. REVALIDAÇÃO DE DISPONIBILIDADE (PRIORIDADE 1..4) IMEDIATAMENTE ANTES DA GRAVAÇÃO DEFINITIVA
+               const snapBloqueioFinal = await dbRef.child('bloqueio').once('value');
+               const snapConfigFinal = await dbRef.child('configCasa').once('value');
+               const bloqFinal = snapBloqueioFinal.val();
+               const cfgFinal = snapConfigFinal.val();
+               const dispFinal = avaliarDisponibilidadeData(dataReserva, bloqFinal, cfgFinal);
+               if (!dispFinal.disponivel) {
+                   await liberarLockMesa(dataReserva, mesaNum, idReserva);
+                   lockAdquirido = false;
+                   const snapRefresh = await dbRef.once('value');
+                   aplicarDadosSnapshotGlobal(snapRefresh.val());
+                   atualizarInterfaceBloqueioCliente();
+                   renderCalendarioCliente();
+                   mostrarAlertaConflitoMesa(dispFinal.mensagem);
+                   return;
+               }
+
                // 4. GRAVAÇÃO DEFINITIVA DA RESERVA APÓS LOCK ATÔMICO GARANTIDO
                await dbRef.child('reservas').child(idReserva).set(novaReserva);
 
@@ -946,12 +1290,13 @@ document.addEventListener('click',()=>fecharTodosCustomSelects());
 
        function reiniciarFormulario() {
            ocultarAlertaConflitoMesa();
+           clienteDataEscolhidaManualmente = false;
            document.getElementById('form-autorreserva').reset();
            validarCapacidadeGrupo();
            sincronizarCustomSelect('cli-horario');
 
            const campoData = document.getElementById('cli-data');
-           campoData.value = obterProximoDomingoLocal();
+           campoData.value = obterProximaDataPermitidaCliente(new Date());
            inicializarCalendarioCliente();
 
            const btnSubmit = document.getElementById('btn-submit');
@@ -1105,11 +1450,82 @@ function fecharAreaAdmin() {
 }
 
 /* ============================================================
-   CONTROLE DE BLOQUEIO / TRANCAMENTO DE RESERVAS — ADMIN
+   CONTROLE DE EXCEÇÕES E BLOQUEIO INDIVIDUAL POR DIA — ADMIN
    ============================================================ */
 let pendenteAcaoBloqueio = null;
 
-function abrirModalConfirmacaoBloqueio(tipo = 'global') {
+function solicitarDesbloqueioDataUnicaAdmin(dataISO) {
+    if (!dataISO) return;
+    abrirModalConfirmacaoBloqueio('data', { dataISO, novoEstado: false });
+}
+
+function solicitarRemoverLiberacaoDataAdmin(dataISO) {
+    if (!dataISO) return;
+    abrirModalConfirmacaoBloqueio('liberar', { dataISO, novoEstado: false });
+}
+
+function focarDataBloqueadaAdmin(dataISO) {
+    const d = dataLocalPorISO(dataISO);
+    if (!d) return;
+    adminMesAtual = new Date(d.getFullYear(), d.getMonth(), 1);
+    adminDataSelecionada = dataISO;
+    renderAdminCalendario();
+    renderAdminReservas();
+}
+
+function renderAdminReleasedDatesChips() {
+    const wrap = document.getElementById('admin-released-dates-wrap');
+    const countEl = document.getElementById('admin-released-dates-count');
+    const listEl = document.getElementById('admin-released-dates-list');
+    if (!wrap || !countEl || !listEl) return;
+
+    const datas = obterListaDatasLiberadas();
+    countEl.textContent = datas.length;
+
+    if (!datas.length) {
+        wrap.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+    }
+
+    wrap.classList.remove('hidden');
+    listEl.innerHTML = datas.map((iso) => `
+        <span class="admin-released-chip">
+            <button type="button" class="admin-blocked-chip-date" onclick="focarDataBloqueadaAdmin('${iso}')" title="Ver data no calendário">${escaparHTMLAdmin(formatarDataBR(iso))}</button>
+            <button type="button" class="admin-blocked-chip-unlock" onclick="solicitarRemoverLiberacaoDataAdmin('${iso}')" title="Remover liberação de ${escaparHTMLAdmin(formatarDataBR(iso))}" aria-label="Remover liberação de ${escaparHTMLAdmin(formatarDataBR(iso))}">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </span>
+    `).join('');
+}
+
+function renderAdminBlockedDatesChips() {
+    const wrap = document.getElementById('admin-blocked-dates-wrap');
+    const countEl = document.getElementById('admin-blocked-dates-count');
+    const listEl = document.getElementById('admin-blocked-dates-list');
+    if (!wrap || !countEl || !listEl) return;
+
+    const datas = obterListaDatasTrancadas();
+    countEl.textContent = datas.length;
+
+    if (!datas.length) {
+        wrap.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+    }
+
+    wrap.classList.remove('hidden');
+    listEl.innerHTML = datas.map((iso) => `
+        <span class="admin-blocked-chip">
+            <button type="button" class="admin-blocked-chip-date" onclick="focarDataBloqueadaAdmin('${iso}')" title="Ver data no calendário">${escaparHTMLAdmin(formatarDataBR(iso))}</button>
+            <button type="button" class="admin-blocked-chip-unlock" onclick="solicitarDesbloqueioDataUnicaAdmin('${iso}')" title="Desbloquear ${escaparHTMLAdmin(formatarDataBR(iso))}" aria-label="Desbloquear ${escaparHTMLAdmin(formatarDataBR(iso))}">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </span>
+    `).join('');
+}
+
+function abrirModalConfirmacaoBloqueio(tipo = 'data', opcoes = {}) {
     if (!adminAutenticado) {
         alert("Ação não autorizada. Acesse a área administrativa com o PIN.");
         return;
@@ -1127,63 +1543,62 @@ function abrirModalConfirmacaoBloqueio(tipo = 'global') {
     if (!modal || !title || !desc || !btnConfirm) return;
     if (erroEl) erroEl.textContent = '';
 
-    if (tipo === 'global') {
-        const estaTrancado = Boolean(estadoGlobal.bloqueio?.trancado);
-        const novoEstado = !estaTrancado;
-        pendenteAcaoBloqueio = { tipo: 'global', novoEstado: novoEstado };
+    const dataISO = opcoes.dataISO || adminDataSelecionada;
+    if (!dataISO) {
+        mostrarPopupNotificacao("Por favor, selecione uma data no calendário primeiro.", "fa-circle-exclamation");
+        return;
+    }
+
+    const dataFormatada = formatarDataBR(dataISO);
+
+    if (tipo === 'liberar') {
+        const estaLiberada = verificarDataEspecificaLiberada(dataISO);
+        const novoEstado = typeof opcoes.novoEstado === 'boolean' ? opcoes.novoEstado : !estaLiberada;
+        pendenteAcaoBloqueio = { tipo: 'liberar', novoEstado: novoEstado, dataISO: dataISO };
 
         if (novoEstado) {
             if (eyebrow) {
-                eyebrow.textContent = "Confirmar ação";
-                eyebrow.style.color = "var(--terracota-sol)";
-            }
-            title.textContent = "Trancar Todas as Reservas";
-            desc.textContent = "Tem certeza de que deseja trancar as reservas? Os clientes verão o aviso 'Capacidade lotada para este dia' e novas autorreservas serão bloqueadas imediatamente em tempo real.";
-            if (icon) icon.className = "fa-solid fa-lock";
-            if (iconWrapper) {
-                iconWrapper.style.color = "var(--terracota-sol)";
-                iconWrapper.style.background = "rgba(224, 130, 63, 0.18)";
-            }
-            btnConfirm.className = "admin-delete-confirm-btn";
-            btnConfirm.style.background = "linear-gradient(135deg, #A85A2A 0%, #853F18 100%)";
-            btnConfirm.innerHTML = `<i class="fa-solid fa-lock"></i> Sim, Trancar Reservas`;
-        } else {
-            if (eyebrow) {
-                eyebrow.textContent = "Confirmar liberação";
+                eyebrow.textContent = "Liberação excepcional de dia";
                 eyebrow.style.color = "var(--verde-vibrante)";
             }
-            title.textContent = "Destrancar Reservas";
-            desc.textContent = "Deseja liberar as reservas novamente? A página pública voltará a exibir as mesas disponíveis e permitirá novas reservas conforme a capacidade existente.";
-            if (icon) icon.className = "fa-solid fa-lock-open";
+            title.textContent = `Liberar ${dataFormatada}`;
+            desc.textContent = `Deseja liberar excepcionalmente o dia ${dataFormatada} para que clientes possam reservar? A liberação vale exclusivamente para esta data, sem abrir outros dias da semana.`;
+            if (icon) icon.className = "fa-solid fa-calendar-check";
             if (iconWrapper) {
                 iconWrapper.style.color = "var(--verde-vibrante)";
                 iconWrapper.style.background = "rgba(16, 185, 129, 0.18)";
             }
             btnConfirm.className = "btn-action";
             btnConfirm.style.background = "linear-gradient(135deg, #2E5A44 0%, #1E3D2E 100%)";
-            btnConfirm.innerHTML = `<i class="fa-solid fa-lock-open"></i> Sim, Destrancar Reservas`;
+            btnConfirm.innerHTML = `<i class="fa-solid fa-calendar-check"></i> Liberar Data`;
+        } else {
+            if (eyebrow) {
+                eyebrow.textContent = "Remover liberação excepcional";
+                eyebrow.style.color = "var(--terracota-sol)";
+            }
+            title.textContent = `Remover liberação de ${dataFormatada}`;
+            desc.textContent = `Deseja encerrar a liberação excepcional de ${dataFormatada}? Este dia voltará à regra padrão do restaurante (fechado em dias comuns da semana).`;
+            if (icon) icon.className = "fa-solid fa-calendar-xmark";
+            if (iconWrapper) {
+                iconWrapper.style.color = "var(--terracota-sol)";
+                iconWrapper.style.background = "rgba(224, 130, 63, 0.18)";
+            }
+            btnConfirm.className = "admin-delete-confirm-btn";
+            btnConfirm.style.background = "linear-gradient(135deg, #A85A2A 0%, #853F18 100%)";
+            btnConfirm.innerHTML = `<i class="fa-solid fa-calendar-xmark"></i> Remover Liberação`;
         }
-    } else if (tipo === 'data') {
-        const dataISO = adminDataSelecionada;
-        if (!dataISO) {
-            alert("Por favor, selecione uma data no calendário primeiro.");
-            return;
-        }
-        const dataKey = dataISO.replace(/-/g, '_');
-        const estaDataTrancada = Boolean(
-            estadoGlobal.bloqueio?.datasTrancadas?.[dataKey] || estadoGlobal.bloqueio?.datasTrancadas?.[dataISO]
-        );
-        const novoEstado = !estaDataTrancada;
+    } else {
+        const estaDataTrancada = verificarDataEspecificaTrancada(dataISO);
+        const novoEstado = typeof opcoes.novoEstado === 'boolean' ? opcoes.novoEstado : !estaDataTrancada;
         pendenteAcaoBloqueio = { tipo: 'data', novoEstado: novoEstado, dataISO: dataISO };
-        const dataFormatada = formatarDataBR(dataISO);
 
         if (novoEstado) {
             if (eyebrow) {
-                eyebrow.textContent = "Bloqueio por data";
+                eyebrow.textContent = "Bloqueio individual de dia";
                 eyebrow.style.color = "var(--terracota-sol)";
             }
-            title.textContent = `Trancar Reservas de ${dataFormatada}`;
-            desc.textContent = `Deseja trancar novas reservas especificamente para o dia ${dataFormatada}? Clientes que selecionarem essa data verão a mensagem de capacidade lotada.`;
+            title.textContent = `Bloquear ${dataFormatada}`;
+            desc.textContent = `Deseja bloquear novas reservas somente para o dia ${dataFormatada}? As reservas existentes serão mantidas e todos os outros dias seguirão suas regras normais.`;
             if (icon) icon.className = "fa-solid fa-lock";
             if (iconWrapper) {
                 iconWrapper.style.color = "var(--terracota-sol)";
@@ -1191,14 +1606,14 @@ function abrirModalConfirmacaoBloqueio(tipo = 'global') {
             }
             btnConfirm.className = "admin-delete-confirm-btn";
             btnConfirm.style.background = "linear-gradient(135deg, #A85A2A 0%, #853F18 100%)";
-            btnConfirm.innerHTML = `<i class="fa-solid fa-lock"></i> Trancar Esta Data`;
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock"></i> Bloquear Este Dia`;
         } else {
             if (eyebrow) {
-                eyebrow.textContent = "Liberação por data";
+                eyebrow.textContent = "Desbloqueio individual de dia";
                 eyebrow.style.color = "var(--verde-vibrante)";
             }
-            title.textContent = `Liberar Reservas de ${dataFormatada}`;
-            desc.textContent = `Deseja liberar as reservas para o dia ${dataFormatada}? A página pública voltará a permitir agendamentos para essa data.`;
+            title.textContent = `Desbloquear ${dataFormatada}`;
+            desc.textContent = `Deseja desbloquear somente o dia ${dataFormatada}? As demais datas bloqueadas permanecerão bloqueadas.`;
             if (icon) icon.className = "fa-solid fa-lock-open";
             if (iconWrapper) {
                 iconWrapper.style.color = "var(--verde-vibrante)";
@@ -1206,7 +1621,7 @@ function abrirModalConfirmacaoBloqueio(tipo = 'global') {
             }
             btnConfirm.className = "btn-action";
             btnConfirm.style.background = "linear-gradient(135deg, #2E5A44 0%, #1E3D2E 100%)";
-            btnConfirm.innerHTML = `<i class="fa-solid fa-lock-open"></i> Liberar Esta Data`;
+            btnConfirm.innerHTML = `<i class="fa-solid fa-lock-open"></i> Desbloquear Este Dia`;
         }
     }
 
@@ -1225,13 +1640,66 @@ function fecharModalBloqueioAdmin() {
     pendenteAcaoBloqueio = null;
 }
 
+function montarAtualizacaoDataIndividual(dataISO, bloquear) {
+    if (!ehDataValidaISO(dataISO)) return null;
+    const keyDash = String(dataISO);
+    const keyUnder = keyDash.replace(/-/g, '_');
+    const updates = {
+        'bloqueio/trancado': false,
+        'configCasa/reservasTrancadas': false,
+        'bloqueio/atualizadoEm': new Date().toISOString(),
+        'bloqueio/atualizadoPor': 'admin'
+    };
+    if (bloquear) {
+        updates[`bloqueio/datasTrancadas/${keyDash}`] = true;
+        updates[`bloqueio/datasTrancadas/${keyUnder}`] = null;
+        updates[`configCasa/datasTrancadas/${keyDash}`] = true;
+        updates[`configCasa/datasTrancadas/${keyUnder}`] = null;
+    } else {
+        updates[`bloqueio/datasTrancadas/${keyDash}`] = null;
+        updates[`bloqueio/datasTrancadas/${keyUnder}`] = null;
+        updates[`configCasa/datasTrancadas/${keyDash}`] = null;
+        updates[`configCasa/datasTrancadas/${keyUnder}`] = null;
+    }
+    return updates;
+}
+
+function montarAtualizacaoLiberacaoData(dataISO, liberar) {
+    if (!ehDataValidaISO(dataISO)) return null;
+    const keyDash = String(dataISO);
+    const keyUnder = keyDash.replace(/-/g, '_');
+    const updates = {
+        'bloqueio/trancado': false,
+        'configCasa/reservasTrancadas': false,
+        'bloqueio/atualizadoEm': new Date().toISOString(),
+        'bloqueio/atualizadoPor': 'admin'
+    };
+    if (liberar) {
+        updates[`bloqueio/datasLiberadas/${keyDash}`] = true;
+        updates[`bloqueio/datasLiberadas/${keyUnder}`] = null;
+        updates[`configCasa/datasLiberadas/${keyDash}`] = true;
+        updates[`configCasa/datasLiberadas/${keyUnder}`] = null;
+        // Ao liberar explicitamente a data, remove eventual bloqueio manual dessa mesma data
+        updates[`bloqueio/datasTrancadas/${keyDash}`] = null;
+        updates[`bloqueio/datasTrancadas/${keyUnder}`] = null;
+        updates[`configCasa/datasTrancadas/${keyDash}`] = null;
+        updates[`configCasa/datasTrancadas/${keyUnder}`] = null;
+    } else {
+        updates[`bloqueio/datasLiberadas/${keyDash}`] = null;
+        updates[`bloqueio/datasLiberadas/${keyUnder}`] = null;
+        updates[`configCasa/datasLiberadas/${keyDash}`] = null;
+        updates[`configCasa/datasLiberadas/${keyUnder}`] = null;
+    }
+    return updates;
+}
+
 async function confirmarAlteracaoBloqueioAdmin() {
     if (!adminAutenticado) {
         alert("Ação não autorizada. Acesse a área administrativa com o PIN.");
         fecharModalBloqueioAdmin();
         return;
     }
-    if (!pendenteAcaoBloqueio) return;
+    if (!pendenteAcaoBloqueio || !pendenteAcaoBloqueio.dataISO) return;
 
     const btnConfirm = document.getElementById('admin-btn-confirm-lock');
     const erroEl = document.getElementById('admin-lock-error');
@@ -1241,35 +1709,26 @@ async function confirmarAlteracaoBloqueioAdmin() {
     }
 
     try {
-        if (pendenteAcaoBloqueio.tipo === 'global') {
-            const novo = pendenteAcaoBloqueio.novoEstado;
-            const agora = new Date().toISOString();
-            await Promise.all([
-                dbRef.child('bloqueio').child('trancado').set(novo),
-                dbRef.child('bloqueio').child('mensagem').set("Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão."),
-                dbRef.child('bloqueio').child('atualizadoEm').set(agora),
-                dbRef.child('bloqueio').child('atualizadoPor').set('admin'),
-                dbRef.child('configCasa').child('reservasTrancadas').set(novo)
-            ]);
+        const tipo = pendenteAcaoBloqueio.tipo || 'data';
+        const dataISO = pendenteAcaoBloqueio.dataISO;
+        const novo = Boolean(pendenteAcaoBloqueio.novoEstado);
+        const updates = tipo === 'liberar'
+            ? montarAtualizacaoLiberacaoData(dataISO, novo)
+            : montarAtualizacaoDataIndividual(dataISO, novo);
+        if (!updates) {
+            throw new Error('Data selecionada fora do período permitido (2026–2027).');
+        }
+        await dbRef.update(updates);
 
-            fecharModalBloqueioAdmin();
+        fecharModalBloqueioAdmin();
+        if (tipo === 'liberar') {
             mostrarPopupNotificacao(
-                novo ? "Reservas trancadas com sucesso!" : "Reservas liberadas com sucesso!",
-                novo ? "fa-lock" : "fa-lock-open"
+                novo ? `Data ${formatarDataBR(dataISO)} liberada excepcionalmente!` : `Liberação de ${formatarDataBR(dataISO)} removida!`,
+                novo ? "fa-calendar-check" : "fa-calendar-xmark"
             );
-        } else if (pendenteAcaoBloqueio.tipo === 'data' && pendenteAcaoBloqueio.dataISO) {
-            const dataISO = pendenteAcaoBloqueio.dataISO;
-            const key = dataISO.replace(/-/g, '_');
-            const novo = pendenteAcaoBloqueio.novoEstado;
-
-            await Promise.all([
-                dbRef.child('bloqueio').child('datasTrancadas').child(key).set(novo),
-                dbRef.child('configCasa').child('datasTrancadas').child(key).set(novo)
-            ]);
-
-            fecharModalBloqueioAdmin();
+        } else {
             mostrarPopupNotificacao(
-                novo ? `Data ${formatarDataBR(dataISO)} trancada!` : `Data ${formatarDataBR(dataISO)} liberada!`,
+                novo ? `Data ${formatarDataBR(dataISO)} bloqueada!` : `Data ${formatarDataBR(dataISO)} desbloqueada!`,
                 novo ? "fa-lock" : "fa-lock-open"
             );
         }
@@ -1277,10 +1736,11 @@ async function confirmarAlteracaoBloqueioAdmin() {
         atualizarStatusBloqueioAdmin();
         atualizarInterfaceBloqueioCliente();
         atualizarSelectMesas();
+        renderCalendarioCliente();
         renderAdminCalendario();
         renderAdminReservas();
     } catch (erro) {
-        console.error("Erro ao alterar bloqueio:", erro);
+        console.error("Erro ao alterar disponibilidade:", erro);
         if (erroEl) erroEl.textContent = "Erro ao sincronizar com o Firebase: " + (erro.message || erro);
         else alert("Erro ao atualizar o Firebase: " + (erro.message || erro));
     } finally {
@@ -1291,102 +1751,140 @@ async function confirmarAlteracaoBloqueioAdmin() {
 function atualizarStatusBloqueioAdmin() {
     if (!adminAutenticado) return;
 
-    const estaTrancado = Boolean(estadoGlobal.bloqueio?.trancado);
+    const dataSelecionada = adminDataSelecionada;
+    const disp = dataSelecionada
+        ? avaliarDisponibilidadeData(dataSelecionada, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true)
+        : null;
+
+    const estaDataTrancada = Boolean(disp && disp.prioridade === 1);
+    const estaLiberadaManual = Boolean(disp && disp.prioridade === 2);
+    const ehPadraoAberto = Boolean(disp && disp.prioridade === 3);
+    const ehDiaComumFechado = Boolean(disp && disp.prioridade === 4);
+
+    const selectedDateEl = document.getElementById('admin-lock-selected-date');
     const badge = document.getElementById('admin-lock-badge');
+    const btnLiberar = document.getElementById('admin-btn-liberar-data');
     const btnToggle = document.getElementById('admin-btn-toggle-bloqueio');
     const infoText = document.getElementById('admin-lock-info-text');
 
+    if (selectedDateEl) {
+        selectedDateEl.textContent = dataSelecionada ? formatarDataBR(dataSelecionada) : '-';
+    }
+
     if (badge) {
-        if (estaTrancado) {
+        if (!dataSelecionada) {
+            badge.className = "admin-lock-badge badge-fechado-padrao";
+            badge.innerHTML = `<i class="fa-regular fa-calendar"></i> Selecione uma data`;
+        } else if (estaDataTrancada) {
             badge.className = "admin-lock-badge badge-trancado";
-            badge.innerHTML = `<i class="fa-solid fa-lock"></i> Reservas Trancadas`;
-        } else {
+            badge.innerHTML = `<i class="fa-solid fa-lock"></i> Dia Bloqueado`;
+        } else if (estaLiberadaManual) {
             badge.className = "admin-lock-badge badge-liberado";
-            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Reservas Liberadas`;
+            badge.innerHTML = `<i class="fa-solid fa-calendar-check"></i> Liberada (Exceção)`;
+        } else if (ehPadraoAberto) {
+            badge.className = "admin-lock-badge badge-liberado";
+            badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${disp.ehFeriado ? 'Liberado (Feriado)' : 'Liberado (Domingo)'}`;
+        } else {
+            badge.className = "admin-lock-badge badge-fechado-padrao";
+            badge.innerHTML = `<i class="fa-solid fa-ban"></i> Fechado (Dia Comum)`;
+        }
+    }
+
+    if (btnLiberar) {
+        if (!dataSelecionada || ehPadraoAberto || estaDataTrancada) {
+            btnLiberar.classList.add('hidden');
+        } else if (estaLiberadaManual) {
+            btnLiberar.classList.remove('hidden');
+            btnLiberar.disabled = false;
+            btnLiberar.className = "admin-lock-toggle-btn btn-remover-liberacao";
+            btnLiberar.innerHTML = `<i class="fa-solid fa-calendar-xmark"></i> <span>Remover liberação</span>`;
+            btnLiberar.title = "Encerrar liberação excepcional e voltar à regra padrão";
+            btnLiberar.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('liberar', { novoEstado: false })");
+        } else {
+            btnLiberar.classList.remove('hidden');
+            btnLiberar.disabled = false;
+            btnLiberar.className = "admin-lock-toggle-btn btn-liberar";
+            btnLiberar.innerHTML = `<i class="fa-solid fa-calendar-check"></i> <span>Liberar data</span>`;
+            btnLiberar.title = "Liberar excepcionalmente somente esta data para reservas";
+            btnLiberar.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('liberar', { novoEstado: true })");
         }
     }
 
     if (btnToggle) {
-        if (estaTrancado) {
+        btnToggle.disabled = !dataSelecionada;
+        if (estaDataTrancada) {
             btnToggle.className = "admin-lock-toggle-btn btn-destrancar";
-            btnToggle.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Destrancar Reservas</span>`;
-            btnToggle.title = "Clique para liberar as reservas para o público";
+            btnToggle.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Desbloquear este dia</span>`;
+            btnToggle.title = "Clique para desbloquear somente esta data";
         } else {
             btnToggle.className = "admin-lock-toggle-btn btn-trancar";
-            btnToggle.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Trancar Reservas</span>`;
-            btnToggle.title = "Clique para trancar e impedir novas reservas";
+            btnToggle.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Bloquear este dia</span>`;
+            btnToggle.title = "Clique para bloquear somente esta data";
         }
     }
 
     if (infoText) {
-        if (estaTrancado) {
-            infoText.innerHTML = `⚠️ <strong>Bloqueio ativo no sistema:</strong> A página pública exibe o aviso <em>"Capacidade lotada para este dia! No momento, não estamos aceitando novas reservas. Agradecemos pela compreensão."</em> e impede seleção de mesas e horários.`;
-        } else {
-            infoText.textContent = `Quando as reservas estiverem trancadas, a página pública oculta mesas e horários e exibe o aviso de capacidade lotada em tempo real.`;
+        if (!dataSelecionada) {
+            infoText.textContent = "Selecione uma data no calendário abaixo para gerenciar bloqueios ou liberações excepcionais.";
+        } else if (estaDataTrancada) {
+            infoText.innerHTML = `🔒 <strong>Dia ${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} bloqueado manualmente:</strong> Prioridade máxima ativa. Clientes não podem fazer novas reservas nesta data, mesmo que seja domingo, feriado ou tenha sido liberada antes. Reservas existentes continuam preservadas.`;
+        } else if (estaLiberadaManual) {
+            infoText.innerHTML = `✅ <strong>Dia ${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} liberado manualmente:</strong> Funcionamento excepcional ativo somente para esta data. Outros dias comuns da semana continuam indisponíveis.`;
+        } else if (ehPadraoAberto) {
+            infoText.innerHTML = `📅 <strong>${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} (${disp.ehFeriado ? 'Feriado' : 'Domingo'}):</strong> Aberto pela regra padrão de funcionamento. Caso precise fechar apenas este dia, clique em <strong>Bloquear este dia</strong>.`;
+        } else if (ehDiaComumFechado) {
+            infoText.innerHTML = `⛔ <strong>${escaparHTMLAdmin(formatarDataBR(dataSelecionada))} (Dia comum da semana):</strong> Indisponível pela regra padrão. Para abrir excepcionalmente apenas esta data, clique em <strong>Liberar data</strong>.`;
         }
     }
 
-    // Status da data selecionada na lista
-    const dataSelecionada = adminDataSelecionada;
     const badgeData = document.getElementById('admin-date-lock-status');
     const btnData = document.getElementById('admin-btn-toggle-date-lock');
 
     if (dataSelecionada && badgeData && btnData) {
         btnData.classList.remove('hidden');
-        const dataKey = dataSelecionada.replace(/-/g, '_');
-        const estaDataTrancada = Boolean(
-            estadoGlobal.bloqueio?.datasTrancadas?.[dataKey] || estadoGlobal.bloqueio?.datasTrancadas?.[dataSelecionada]
-        );
-
-        if (estaTrancado) {
+        if (estaDataTrancada) {
             badgeData.className = "admin-date-lock-status trancada";
-            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Trancada (Geral)`;
-            btnData.disabled = true;
-            btnData.title = "O bloqueio geral do sistema já está trancando todas as datas";
-            btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Bloqueio geral ativo</span>`;
-        } else if (estaDataTrancada) {
-            badgeData.className = "admin-date-lock-status trancada";
-            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Data Trancada`;
+            badgeData.innerHTML = `<i class="fa-solid fa-lock"></i> Bloqueada`;
             btnData.disabled = false;
-            btnData.title = "Clique para liberar esta data específica";
-            btnData.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Liberar data</span>`;
-        } else {
+            btnData.title = "Clique para desbloquear esta data específica";
+            btnData.innerHTML = `<i class="fa-solid fa-lock-open"></i> <span>Desbloquear data</span>`;
+            btnData.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('data')");
+        } else if (estaLiberadaManual) {
+            badgeData.className = "admin-date-lock-status liberada";
+            badgeData.innerHTML = `<i class="fa-solid fa-calendar-check"></i> Liberada Extra`;
+            btnData.disabled = false;
+            btnData.title = "Clique para remover a liberação excepcional desta data";
+            btnData.innerHTML = `<i class="fa-solid fa-calendar-xmark"></i> <span>Remover liberação</span>`;
+            btnData.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('liberar', { novoEstado: false })");
+        } else if (ehPadraoAberto) {
             badgeData.className = "admin-date-lock-status liberada";
             badgeData.innerHTML = `<i class="fa-solid fa-circle-check"></i> Data Liberada`;
             btnData.disabled = false;
-            btnData.title = "Clique para trancar esta data específica";
-            btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Trancar data</span>`;
+            btnData.title = "Clique para bloquear esta data específica";
+            btnData.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Bloquear data</span>`;
+            btnData.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('data')");
+        } else {
+            badgeData.className = "admin-date-lock-status fechado-padrao";
+            badgeData.innerHTML = `<i class="fa-solid fa-ban"></i> Dia Comum Fechado`;
+            btnData.disabled = false;
+            btnData.title = "Clique para liberar excepcionalmente esta data";
+            btnData.innerHTML = `<i class="fa-solid fa-calendar-check"></i> <span>Liberar data</span>`;
+            btnData.setAttribute('onclick', "abrirModalConfirmacaoBloqueio('liberar', { novoEstado: true })");
         }
     }
 }
 
 function ehDataPermitidaAdmin(dataISO) {
     if (!dataISO) return false;
-
-    const partes = dataISO.split("-");
-    const data = new Date(
-        Number(partes[0]),
-        Number(partes[1]) - 1,
-        Number(partes[2])
-    );
-
-    return data.getDay() === 0 || feriadosPermitidos.includes(dataISO);
+    if (ehDataValidaISO(dataISO)) return true;
+    return getReservasDaDataAdmin(dataISO).length > 0;
 }
 
 function obterProximaDataPermitidaAdmin(dataInicial) {
-    const data = new Date(
-        dataInicial.getFullYear(),
-        dataInicial.getMonth(),
-        dataInicial.getDate()
-    );
-
-    for (let i = 0; i < 370; i++) {
-        const iso = obterDataFormatadaISO(data);
-        if (ehDataPermitidaAdmin(iso)) return iso;
-        data.setDate(data.getDate() + 1);
-    }
-
-    return obterDataFormatadaISO(dataInicial);
+    const hoje = dataInicial || new Date();
+    const iso = obterDataFormatadaISO(hoje);
+    if (ehDataPermitidaAdmin(iso)) return iso;
+    return `${ANO_MINIMO_CALENDARIO}-01-01`;
 }
 
 function getReservasAtivasAdmin() {
@@ -1415,11 +1913,15 @@ function getTotalPessoasReservaAdmin(r) {
 }
 
 function mudarMesAdmin(delta) {
-    adminMesAtual = new Date(
+    const nova = new Date(
         adminMesAtual.getFullYear(),
         adminMesAtual.getMonth() + delta,
         1
     );
+    const minMes = new Date(ANO_MINIMO_CALENDARIO, 0, 1);
+    const maxMes = new Date(ANO_MAXIMO_CALENDARIO, 11, 1);
+    if (nova < minMes || nova > maxMes) return;
+    adminMesAtual = nova;
 
     renderAdminCalendario();
 }
@@ -1456,6 +1958,12 @@ function renderAdminCalendario() {
 
     titulo.textContent = `${nomesMesesAdmin[mes]} ${ano}`;
 
+    const minMes = new Date(ANO_MINIMO_CALENDARIO, 0, 1);
+    const maxMes = new Date(ANO_MAXIMO_CALENDARIO, 11, 1);
+    const botoesAdmin = document.querySelectorAll('.admin-calendar-nav button');
+    if (botoesAdmin[0]) botoesAdmin[0].disabled = adminMesAtual <= minMes;
+    if (botoesAdmin[2]) botoesAdmin[2].disabled = adminMesAtual >= maxMes;
+
     let html = "";
 
     nomesDiasAdmin.forEach((dia) => {
@@ -1473,18 +1981,31 @@ function renderAdminCalendario() {
         const dataObj = new Date(ano, mes, dia);
         const iso = obterDataFormatadaISO(dataObj);
         const permitido = ehDataPermitidaAdmin(iso);
-        const ehFeriado = feriadosPermitidos.includes(iso);
+        const disp = avaliarDisponibilidadeData(iso, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true);
+        const ehFeriado = ehFeriadoISO(iso);
+        const estaBloqueado = disp.prioridade === 1;
+        const estaLiberadoExtra = disp.prioridade === 2;
+        const diaComumFechado = disp.prioridade === 4;
         const reservas = getReservasDaDataAdmin(iso);
 
         const classes = [
             "admin-day",
             permitido ? "valid" : "",
             ehFeriado ? "feriado" : "",
+            estaLiberadoExtra ? "released" : "",
+            estaBloqueado ? "blocked" : "",
+            diaComumFechado ? "dia-fechado" : "",
             iso === adminDataSelecionada ? "selected" : ""
         ].filter(Boolean).join(" ");
 
         let label = "";
-        if (ehFeriado) label = `<span class="admin-day-label">feriado</span>`;
+        if (estaBloqueado) {
+            label = `<span class="admin-day-lock-badge"><i class="fa-solid fa-lock"></i> Bloq.</span>`;
+        } else if (estaLiberadoExtra) {
+            label = `<span class="admin-day-release-badge"><i class="fa-solid fa-calendar-check"></i> Extra</span>`;
+        } else if (ehFeriado) {
+            label = `<span class="admin-day-label">feriado</span>`;
+        }
 
         let badge = "";
         if (reservas.length > 0) {
@@ -1495,7 +2016,7 @@ function renderAdminCalendario() {
             <button type="button"
                 class="${classes}"
                 ${permitido ? `onclick="selecionarDataAdmin('${iso}')"` : "disabled"}
-                aria-label="${permitido ? `Selecionar ${formatarDataBR(iso)}` : "Data não disponível"}">
+                aria-label="${permitido ? `Selecionar ${formatarDataBR(iso)}${estaBloqueado ? ' (Bloqueado)' : (estaLiberadoExtra ? ' (Liberado extra)' : (diaComumFechado ? ' (Dia comum fechado)' : ''))}` : "Data não disponível"}">
                 <span class="admin-day-number">${dia}</span>
                 ${label}
                 ${badge}
@@ -1504,6 +2025,8 @@ function renderAdminCalendario() {
     }
 
     calendario.innerHTML = html;
+    renderAdminReleasedDatesChips();
+    renderAdminBlockedDatesChips();
 }
 
 function renderAdminReservas() {
@@ -1562,11 +2085,20 @@ function renderAdminReservas() {
     document.getElementById("admin-total-criancas").textContent = totalCriancas;
 
     if (!reservasFiltradas.length) {
+        const dispDataAdmin = data ? avaliarDisponibilidadeData(data, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true) : null;
+        let mensagemVazia = "Esta data está disponível, mas ainda não possui reservas abertas.";
+        if (busca) {
+            mensagemVazia = "Tente pesquisar por outro nome, mesa ou horário.";
+        } else if (dispDataAdmin?.prioridade === 1) {
+            mensagemVazia = "Esta data está bloqueada manualmente para novas reservas.";
+        } else if (dispDataAdmin?.prioridade === 4) {
+            mensagemVazia = 'Dia comum fechado pela regra padrão (domingos e feriados). Use "Liberar data" acima se desejar abrir exceção.';
+        }
         lista.innerHTML = `
             <div class="admin-empty">
                 <i class="fa-regular fa-calendar-xmark"></i>
                 <strong>${busca ? "Nenhuma reserva encontrada" : "Nenhuma reserva nesta data"}</strong>
-                <span>${busca ? "Tente pesquisar por outro nome, mesa ou horário." : "Esta data está disponível, mas ainda não possui reservas abertas."}</span>
+                <span>${mensagemVazia}</span>
             </div>
         `;
         return;
@@ -1641,30 +2173,31 @@ function preencherDatasEdicaoAdmin(dataAtual) {
     const select = document.getElementById('admin-edit-data');
     if (!select) return;
 
-    const dataBase = dataAtual ? new Date(`${dataAtual}T12:00:00`) : new Date();
-    const anoBase = dataBase.getFullYear();
-    const mesBase = dataBase.getMonth();
     const datas = [];
-
-    // Mostra 18 meses em torno da data atual da reserva, sempre somente domingos/feriados.
-    for (let offset = -6; offset <= 12; offset++) {
-        const mes = new Date(anoBase, mesBase + offset, 1);
-        const totalDias = new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDate();
-        for (let dia = 1; dia <= totalDias; dia++) {
-            const d = new Date(mes.getFullYear(), mes.getMonth(), dia);
-            const iso = obterDataFormatadaISO(d);
-            if (ehDataPermitidaAdmin(iso)) datas.push(iso);
+    const hoje = new Date();
+    const inicio = new Date(Math.max(new Date(ANO_MINIMO_CALENDARIO, 0, 1).getTime(), new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()).getTime()));
+    const fim = new Date(ANO_MAXIMO_CALENDARIO, 11, 31);
+    const cursor = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+    while (cursor <= fim) {
+        const iso = obterDataFormatadaISO(cursor);
+        if (avaliarDisponibilidadeData(iso, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true).disponivel || iso === dataAtual) {
+            datas.push(iso);
         }
+        cursor.setDate(cursor.getDate() + 1);
     }
 
-    if (dataAtual && !datas.includes(dataAtual) && ehDataPermitidaAdmin(dataAtual)) {
+    if (dataAtual && !datas.includes(dataAtual)) {
         datas.push(dataAtual);
     }
 
     datas.sort();
-    select.innerHTML = datas.map(iso =>
-        `<option value="${iso}">${escaparHTMLAdmin(formatarDataBR(iso))}</option>`
-    ).join('');
+    select.innerHTML = datas.map(iso => {
+        const disp = avaliarDisponibilidadeData(iso, estadoGlobal?.bloqueio, estadoGlobal?.configCasa, true);
+        const tag = disp.prioridade === 2
+            ? ' (Liberada)'
+            : (disp.ehFeriado ? ' (Feriado)' : (disp.ehDomingo ? ' (Domingo)' : ''));
+        return `<option value="${iso}">${escaparHTMLAdmin(formatarDataBR(iso) + tag)}</option>`;
+    }).join('');
     select.value = dataAtual || '';
 }
 
@@ -1756,8 +2289,8 @@ async function salvarEdicaoReservaAdmin() {
         erro.textContent = 'Informe o nome do cliente.';
         return;
     }
-    if (!data || !ehDataPermitidaAdmin(data)) {
-        erro.textContent = 'A data deve ser um domingo ou feriado permitido.';
+    if (!data || (!ehDataValidaISO(data) && data !== reservaOriginal.data)) {
+        erro.textContent = 'Selecione uma data válida dentro do calendário de 2026 ou 2027.';
         return;
     }
     if (!mesa) {
